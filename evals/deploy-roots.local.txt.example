@@ -1,0 +1,6 @@
+# deploy-roots.local.txt.example — 机器专属根清单模板（F-52）
+# 复制为同目录 deploy-roots.local.txt（该文件不入包），按本机实际情况填写。
+# check-deploy.py 查找顺序：本副本 evals/ → ~/.zcode 主副本 evals/；两处皆无时输出
+# NOTICE 且机器专属根不在断言范围（覆盖不完整）。
+# 示例（一行一根）：
+# D:/某项目目录/.dsh/skills/blender-mcp

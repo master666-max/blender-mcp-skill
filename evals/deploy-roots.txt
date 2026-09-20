@@ -1,0 +1,10 @@
+# evals/deploy-roots.txt — 部署根基线·内置部分（F-47 入包 / F-48 可移植化）
+# 每行一根；~ 开头按用户主目录展开；# 开头与空行忽略。
+# 本文件只放**可移植根**（~ 形式）。机器专属根（项目级根等绝对路径）写在
+# 本目录的 deploy-roots.local.txt（**不入包**，*.local.txt 打包排除——换机/迁移只改 local）。
+# check-deploy.py 断言：内置+local 合并基线的根必须全部存在且与发布包逐文件一致；
+# 扫描发现的未登记根同样 FAIL（多根/少根都不过——根集合本身受断言保护）。
+~/.zcode/skills/blender-mcp
+~/.dsh/skills/blender-mcp
+~/.claude/skills/blender-mcp
+~/.codebuddy/skills/blender-mcp

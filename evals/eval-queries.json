@@ -1,0 +1,25 @@
+{
+  "note": "触发评测集：should=true 应激活 skill；should=false 为 near-miss 负例（共享关键词但任务不同）。每条跑 3 次计触发率，阈值 0.5。",
+  "queries": [
+    {"q": "帮我在这台 Blender 里建一个低多边形小岛，有树有石头", "should": true},
+    {"q": "把这个坦克模型渲染一张 45 度角的图出来", "should": true},
+    {"q": "给车壳上个金属漆材质，要能看到反光", "should": true},
+    {"q": "场景里面数是多少？有没有非流形啊", "should": true},
+    {"q": "给立方体做一个 30 帧升起的动画", "should": true},
+    {"q": "从 PolyHaven 找一张日落 HDRI 打个光", "should": true},
+    {"q": "导出成 glb 给引擎用", "should": true},
+    {"q": "add a three point lighting rig and render", "should": true},
+    {"q": "帮我把这个物体的法线检查一下，黑面了", "should": true},
+    {"q": "做一个参数化的楼梯生成器，台阶数可以调", "should": true},
+    {"q": "用 python 脚本读一个 csv 统计每列均值", "should": false},
+    {"q": "Blender 这款果汁机的价格是多少", "should": false},
+    {"q": "写一个 three.js 的场景，放几个立方体", "should": false},
+    {"q": "帮我把照片里的物体抠出来", "should": false},
+    {"q": "3D 打印模型切片参数怎么设", "should": false},
+    {"q": "做个椅子", "should": true},
+    {"q": "帮我建一个小房间场景，里面有桌子台灯", "should": true},
+    {"q": "渲染一张白底电商图", "should": true},
+    {"q": "把这个导出成 fbx 给 unity 用", "should": true},
+    {"q": "写个 python 函数排序一个列表", "should": false}
+  ]
+}
