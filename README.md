@@ -1,6 +1,6 @@
 # blender-mcp-skill
 
-[![Version](https://img.shields.io/badge/version-2.7.0-blue)](https://github.com/master666-max/blender-mcp-skill/releases)
+[![Version](https://img.shields.io/badge/version-2.8.0-blue)](https://github.com/master666-max/blender-mcp-skill/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#许可与出处)
 [![Blender](https://img.shields.io/badge/Blender-5.2_LTS-orange)](https://www.blender.org)
 [![Platform](https://img.shields.io/badge/platform-Windows_·_macOS_·_Linux-lightgrey)](#上手三步)
@@ -83,7 +83,7 @@ flowchart LR
 
 **4. 状态一致性**——幂等脚本（重复执行结果一致）；程序化操作后强制退化清理（否则模型悄悄变脏）；快照先行；身份差集对账。
 
-**5. 可验证性工程（看家本领）**——手册中 91 条关键承诺各配一条"指纹"，发布前 91 项全量回归；版本号三处对齐断言；安装位置逐字节比对断言；**对检查器本身做破坏测试**（故意改坏规则/删记录行/塞恒真条件，检查器必须报警——"对验收测试的验收"）。
+**5. 可验证性工程（看家本领）**——手册中 92 条关键承诺各配一条"指纹"，发布前 92 项全量回归；版本号三处对齐断言；安装位置逐字节比对断言；**对检查器本身做破坏测试**（故意改坏规则/删记录行/塞恒真条件，检查器必须报警——"对验收测试的验收"）。
 
 **6. 无头与规模化**——两条离屏路线（Blender 命令行 / bpy wheel 常驻进程）；参数化生成器带固定随机种子与参数钳制，跨机器结果一致。
 
@@ -162,7 +162,7 @@ cp -r blender-mcp-skill ~/.zcode/skills/blender-mcp
 | `fragments/` `nodes/` | 代码积木库与节点组库 |
 | `assets/` | 双离线安装包（默认通道 + 回退通道，含校验和、签名公钥、来源说明） |
 | `evals/` | 体检工具：91 条规则回归 runner + 11 条反向探针自检（--repeat 统计）+ 基线归档 |
-| `experience/` | **经验区**：任务实战经验的活区账本（EXP 条目，证据三件套；晋升进分册走发版门；预留演化引擎接口） |
+| `experience/` | **经验区**：活区账本（EXP 条目，证据三件套）+ **演化引擎**（evo-seat 微型内核：账本/链验/质量门/决策留痕/锚定六档；`exp_bridge.py` 桥接 EXP↔引擎）——晋升进分册走发版门 |
 | `docs/` | 设计文档与实战案例 |
 | `showcase/` | 门面展示图 |
 

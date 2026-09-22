@@ -261,6 +261,9 @@ def check_experience_zone(root):
     if not os.path.isfile(index_path):
         return ["EXP-ZONE CHECK FAIL: experience/INDEX.md 缺失（U-07）"]
     legal = {"draft", "verified", "promoted", "pending", "rejected"}
+    for rel in ("engine/README.md", "engine/evo_seat.py", "engine/exp_bridge.py"):
+        if not os.path.isfile(os.path.join(zone, rel)):
+            problems.append("EXP-ZONE CHECK FAIL: 引擎文件缺失 experience/%s（U-08）" % rel)
     entries = sorted(_g.glob(os.path.join(zone, "EXP-*.md")))
     ids = set()
     for path in entries:
@@ -346,7 +349,7 @@ def main():
         print("NO ROWS PARSED — 表格解析失败")
         sys.exit(2)
     # F-159：条款集登记断言——删行/缩表不再静默（新增/删除条款须同步改此数，属刻意的登记动作）
-    EXPECTED_CLAUSES = 91
+    EXPECTED_CLAUSES = 92
     ids = [r["no"] for r in rows]
     if len(rows) != EXPECTED_CLAUSES or ids != list(range(1, EXPECTED_CLAUSES + 1)):
         print("CLAUSE-SET CHECK FAIL: 条款数=%d（期望 %d）或编号非 1..%d 连续——条款行可能被静默增删（F-159）"
