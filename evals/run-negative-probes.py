@@ -8,7 +8,9 @@
 run-regression-checks.py → 断言「指定条款 FAIL 且 exit=1」。另含正例对照
 （不改动 → 全 PASS exit 0）。任一探针未触发或正例失守 → exit 1。
 
-用法：py evals/run-negative-probes.py [--root <skill根目录>]
+用法：py evals/run-negative-probes.py [--root <skill根目录>] [--repeat N]
+  --repeat N：全套探针重复 N 轮，按探针聚合触发率 k/N（pass^k 式可靠度统计，
+  借鉴 tau-bench；单次触发是单点事实，k/N 才是统计事实——B2，v2.6.0）。审计建议 N≥3。
 发布闸：建议每次发版与 ①查 同跑（见 regression-checks.md 发布前四查注记）。
 
 探针集即「最小回归面」：每条对应一次真实空洞或高风险面（F-148/F-149/F-155 家族）。
@@ -53,7 +55,10 @@ PROBES = [
      '感知自检（U-04）', 71, None, 1),
     ('P-NL161 删历史台账行 F-100', 'evals/regression-checks.md',
      '| F-100 |',
-     None, None, 'LEDGER-INVARIANT', 3),
+     None, None, 'LEDGER-SET CHECK FAIL', 3),
+    ('P-N87 发行验签命令破坏', 'INSTALL.md',
+     'ssh-keygen -Y verify',
+     '验签命令已移除（探针破坏位）', 87, None, 1),
 ]
 
 
@@ -72,54 +77,76 @@ def run(runner, root, cwd):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=DEFAULT_ROOT)
+    ap.add_argument("--repeat", type=int, default=1,
+                    help="全套探针重复轮数；按探针聚合触发率 k/N（B2，借鉴 tau-bench pass^k）")
     args = ap.parse_args()
     root = os.path.abspath(args.root)
     runner = os.path.join(HERE, "run-regression-checks.py")
-    tmp = tempfile.mkdtemp(prefix="m13probe_")
+    rounds = max(1, args.repeat)
+    agg = {}          # 探针名 -> [触发数, 轮数]
+    ctrl_ok = 0
     fails = 0
     try:
-        # 正例对照：不改动 → 全 PASS
-        ctrl = os.path.join(tmp, "ctrl")
-        shutil.copytree(root, ctrl,
-                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-        rc, out = run(os.path.join(ctrl, "evals", "run-regression-checks.py"), ctrl, HERE)
-        if rc == 0 and "PASS" in out:
-            print("PASS  正例对照（未改动 → exit 0）")
-        else:
-            print("FAIL  正例对照：未改动副本上 runner 异常（exit %d）——探针结论不可信" % rc)
-            fails += 1
+        for rnd in range(rounds):
+            tmp = tempfile.mkdtemp(prefix="m13probe_")
+            try:
+                tag = "" if rounds == 1 else " R%d" % (rnd + 1)
+                ctrl = os.path.join(tmp, "ctrl")
+                shutil.copytree(root, ctrl,
+                                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+                rc, out = run(os.path.join(ctrl, "evals", "run-regression-checks.py"), ctrl, HERE)
+                if rc == 0 and "PASS" in out:
+                    ctrl_ok += 1
+                    if rounds == 1:
+                        print("PASS  正例对照（未改动 → exit 0）")
+                else:
+                    print("FAIL%s 正例对照：未改动副本上 runner 异常（exit %d）——探针结论不可信" % (tag, rc))
+                    fails += 1
 
-        for pi, (name, rel, old, new, clause, marker, expect_rc) in enumerate(PROBES):
-            d = os.path.join(tmp, "probe_%d" % pi)
-            shutil.copytree(root, d,
-                            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-            target = os.path.join(d, rel.replace("/", os.sep))
-            text = open(target, encoding="utf-8").read()
-            n = text.count(old)
-            if n < 1:
-                print("FAIL  %s：探针旧串在目标文件中不存在（锚串漂移？先修探针或指纹）" % name)
-                fails += 1
-                continue
-            text = text.replace(old, new if new is not None else "", 1 if new else n)
-            open(target, "w", encoding="utf-8", newline="").write(text)
-            rc, out = run(os.path.join(d, "evals", "run-regression-checks.py"), d, HERE)
-            if clause is not None:
-                triggered = ("FAIL  #%02d" % clause) in out or ("FAIL  #%d" % clause) in out
-                label = "FAIL #%d" % clause
-            else:
-                triggered = (marker in out)
-                label = marker
-            if rc == expect_rc and triggered:
-                print("PASS  %s → %s（exit %d）" % (name, label, rc))
-            else:
-                print("FAIL  %s：期望 %s + exit %d，实测 exit=%d、触发=%s"
-                      % (name, label, expect_rc, rc, triggered))
-                fails += 1
+                for pi, (name, rel, old, new, clause, marker, expect_rc) in enumerate(PROBES):
+                    d = os.path.join(tmp, "probe_%d" % pi)
+                    shutil.copytree(root, d,
+                                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+                    target = os.path.join(d, rel.replace("/", os.sep))
+                    text = open(target, encoding="utf-8").read()
+                    n = text.count(old)
+                    if n < 1:
+                        print("FAIL%s %s：探针旧串在目标文件中不存在（锚串漂移？先修探针或指纹）" % (tag, name))
+                        fails += 1
+                        agg.setdefault(name, [0, 0])[1] += 1
+                        continue
+                    text = text.replace(old, new if new is not None else "", 1 if new else n)
+                    open(target, "w", encoding="utf-8", newline="").write(text)
+                    rc, out = run(os.path.join(d, "evals", "run-regression-checks.py"), d, HERE)
+                    if clause is not None:
+                        triggered = ("FAIL  #%02d" % clause) in out or ("FAIL  #%d" % clause) in out
+                        label = "FAIL #%d" % clause
+                    else:
+                        triggered = (marker in out)
+                        label = marker
+                    ok = (rc == expect_rc and triggered)
+                    a = agg.setdefault(name, [0, 0])
+                    a[1] += 1
+                    if ok:
+                        a[0] += 1
+                        if rounds == 1:
+                            print("PASS  %s → %s（exit %d）" % (name, label, rc))
+                    else:
+                        print("FAIL%s %s：期望 %s + exit %d，实测 exit=%d、触发=%s"
+                              % (tag, name, label, expect_rc, rc, triggered))
+                        fails += 1
+            finally:
+                shutil.rmtree(tmp, ignore_errors=True)
     finally:
-        shutil.rmtree(tmp, ignore_errors=True)
-    total = len(PROBES) + 1
-    print("summary: %d/%d PASS（含正例对照；破坏探针 %d 条 + 台账集探针 1 条）"
-          % (total - fails, total, len(PROBES)))
+        pass
+    if rounds > 1:
+        for name, (k, n) in agg.items():
+            mark = "PASS" if k == n else "FAIL"
+            print("%s  %s → 触发 %d/%d" % (mark, name, k, n))
+        print("正例对照： %d/%d 轮通过" % (ctrl_ok, rounds))
+    total = (len(PROBES) + 1) * rounds
+    print("summary: 触发聚合 %d/%d 探针轮（%d 探针 × %d 轮 + 正例对照；全绿=%s）"
+          % (total - fails, total, len(PROBES), rounds, "是" if fails == 0 else "否"))
     sys.exit(1 if fails else 0)
 
 

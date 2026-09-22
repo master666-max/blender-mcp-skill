@@ -9,7 +9,8 @@
 > 全量自动核验：`py evals/run-regression-checks.py`（同目录 runner，逐条跑并输出 PASS/FAIL）。
 
 > **发布前四查（v1.6 起三查，v1.10.3 扩为四查，缺一不发）**：① `py evals/run-regression-checks.py` → 全量 PASS
-> （含条款集登记断言：新增/删除条款须同步 `EXPECTED_CLAUSES`，违反 exit 2——F-159）；
+> （含条款集/台账集登记断言：新增/删除条款须同步 `EXPECTED_CLAUSES`（违反 exit 2）与
+> 新增/删除台账行须同步 `EXPECTED_LEDGER_ROWS`（违反 exit 3）——F-159/F-161）；
 > ② `py evals/check-version.py --expected <版本>` → PASS（frontmatter/INSTALL 标题/zip 名
 > **三者同步**——V-13 教训：v1.5.1 通篇不含自己的版本号）；③ `py evals/check-deploy.py
 > --zip <发布包>` → PASS——**根集合断言**（基线 = 包内 `evals/deploy-roots.txt` 的 ~ 可移植根
@@ -131,6 +132,9 @@
 | 84 | v2.5.1 09 分册主线程/timer 驱动纪律（F-144 落册） | 字面量 | `F-144 实录` | references/09 |
 | 85 | v2.5.3→v2.5.5 SKILL §0 三态判据表**全链有序**（F-148 治本+守体；F-151 补指纹；F-155 勘误重构——v2.5.4 版锚因单层转义被 load_table 还原成裸竖线、正则语义变「或」而恒真（P90~P97 实测零保护），本版改双层转义使正则见字面竖线 + runner 增恒真 lint） | re:链式 | `re:(?s)三态判据（F-148 表）[\s\S]{0,120}勿用 `warning`[\s\S]{0,200}只有 `up_to_date:null`[\s\S]{0,200}\\| `true` \\| `native` \\| 正常 \\| 继续 \\|[\s\S]{0,200}\\| `false` \\| `native` \\| 协议落后（确认过期） \\| 按提示重装 addon（INSTALL §2） \\|[\s\S]{0,200}\\| `false` \\| `missing` \\| 旧 addon 无 get_addon_info（确认过期） \\| 同上重装 \\|[\s\S]{0,200}\\| `null` \\| `error` \\| 握手瞬断/环境问题` | SKILL.md |
 | 86 | v2.5.3 SKILL §0 默认通道声明（F-149 补指纹；F-157 勘误——v2.5.3 版锚内嵌 ** 违反 F-36 语义指纹规范，P99 纯格式变更即假阴性，改语义串） | 字面量 | `默认通道=brickfly-mcp` | SKILL.md |
+| 87 | v2.6.0 INSTALL 发行验签命令（B1 签名；被探针 P-N87 守护） | 字面量 | `ssh-keygen -Y verify` | INSTALL.md |
+| 88 | v2.6.0 11 分册行业安全基线对照附录（B6/B7） | 字面量 | `行业安全基线对照与威胁案例` | references/11 |
+| 89 | v2.6.0 14 分册目验判据验证器规范（B4 校准） | 字面量 | `目验判据的验证器规范` | references/14 |
 
 ## 遗留项台账（低危缓办项追踪——防静默遗失，v1.9.2 起设立）
 
@@ -281,6 +285,9 @@
 | F-162 | 新增条款集断言的退出码语义未传导到权威文本：runner docstring:12 退出码表（2=表格解析失败）与 ①查 定义段均未提 CLAUSE-SET CHECK——修订未传导家族（F-61/F-66），非虚报 | v2.5.7 | ✅ 已修复于 v2.5.8（docstring 退出码表改「2 = 表格解析失败**或条款集登记断言失败**（EXPECTED_CLAUSES，F-159）；3 = …**或台账集登记断言失败**（EXPECTED_LEDGER_ROWS，F-161）」；①查 定义句补条款集登记语——权威文本两处与实作对齐） |
 | F-163 | 随包 M13 自检判定依赖环境编码变量：P-NL161 期望标记为中文串，子进程管道按平台编码（GBK）打印、harness 按 UTF-8 解码 → 默认环境 8/9（exit 1）、强制 UTF-8 才 9/9——发布闸/稳态前置条件的结论随运行环境漂移（唯一以中文为标记的探针） | v2.5.9 | ✅ 已修复（审计四修法取①+③并用：run() 注入 UTF-8 环境使子进程打印与父进程解码对称（对所有探针生效）+ P-NL161 期望标记改 ASCII `LEDGER-INVARIANT`（判据层去环境依赖，与其余 7 条同构）；脚本头增 F-163 纪律（中文标记须在未设编码变量环境实测）。**环境独立性实证**：默认环境（env -u 剥离变量）与 PYTHONUTF8=1 双跑均 9/9 exit 0；①查 定义句同步补 EXPECTED_LEDGER_ROWS 登记（§7(a) 建议）） |
 | F-164 | ④a 编号提取正则把 UTF-8 等词内的 F-8 误当发现编号（v2.5.9 条目首提「UTF-8 解码」即触发「F-8 未登记」误报）——④a 曾被 F-163 轮用于抓台账缺登记，其自身边界需收紧 | v2.5.9 | ✅ 已修复（提取正则加负向后视边界 `(?<![A-Za-z0-9-])`——字母/数字/连字符前的 F-NN 不计；负例自证：含 UTF-8 的条目不再误报，真 F-NN 仍检出） |
+| F-165 | 「已修复」行声称的措施未落地：①查 定义句并未补 EXPECTED_LEDGER_ROWS（声称两处：CHANGELOG v2.5.9 条目 + F-163 台账行处置栏；实测定义句与 v2.5.8 逐字节相同、全文 EXPECTED_LEDGER_ROWS 仅出现在 3 条台账行）——虚报家族第 5 次同形；**根因未确认**（编辑命令自报成功但未持久） | v2.6.0 | ✅ 已修复（定义句改为并列两项：「…须同步 `EXPECTED_CLAUSES`（违反 exit 2）与 `EXPECTED_LEDGER_ROWS`（违反 exit 3）——F-159/F-161」；编辑后 grep 回读验证 4 处在位——F-165 教训的执行形态） |
+| F-166 | P-NL161 期望标记改泛用 ASCII `LEDGER-INVARIANT` 后判定特异性不足：④a/④b 任一台账不变量报错都打印该前缀——「条目提及 F-100 且断言被移除」场景实测假通过（三场景对照） | v2.6.0 | ✅ 已修复（双改：runner 台账集断言加 ASCII 标签 **`LEDGER-SET CHECK FAIL`**（与条款集断言的 `CLAUSE-SET CHECK FAIL` 同形）；P-NL161 改判该标签——恢复与断言一一对应的特异性，端到端实测触发） |
+| U-06 | 外部借鉴调研（10 组检索 8 维度：MCP 安全/Skills 标准/供应链/Blender 生态/评估方法学/EDD/SDD/验证器论文）落地 6 项：**B1** 发行 zip SSH 签名（ed25519，minisign 式 allowed_signers，哈希只防损坏签名才防投毒）+ INSTALL 验签节 + 指纹 #87；**B2** 探针 --repeat pass^k 式触发率统计（借鉴 tau-bench）；**B4** 14 分册目验判据验证器规范（对照 arXiv 2026-04 Verifiers 论文）；**B5** 00 分册敷衍④补 Stechly《Self-Verification Limitations》学术引用；**B6** 11 分册行业安全基线对照附录；**B7** 恶意技能威胁案例附录。B8/B9/B10 登记于 research-hub 本线「借鉴登记_20260921」（包外件，稳态后解锁） | v2.6.0 | ✅ 已落地（指纹 **#87~#89** 配套；细节见 CHANGELOG v2.6.0 条目与本线借鉴登记件（包外）） |
 | U-05 | 用户令"开干，解耦上游"（可行性报告见工作区文件《_blender_skill_上游解耦可行性报告_20260920.md》，裁定 S1 收编）：vendor 上游 2.0.0 全量源码为自有通道 **brickfly-mcp**（MIT，仅身份字段改写——发行名/入口/FastMCP 名/addon 文件名与 bl_info 名/用户引导文本，**协议 7、31 工具、安全模式、五库逻辑逐字节不动**；parity 差异集中在 8 个文件 + addon 10 行、逐行核对全为身份行，可复算口径 git diff --no-index --numstat，F-145 勘误），默认通道切换、上游通道保留为回退、双通道互斥启用纪律入 11 分册 §1.4、版本期望值围栏入 SKILL §0（#81/#82 锁定） | v2.5.0 | ✅ 已落地（**验证链**：① parity diff=仅身份行；② wheel dist-info 手术构建+RECORD 自检；③ uv tool install 与上游 2.0.0 并存；④ stdio 直驱 initialize=BrickflyMCP/tools/list=31；⑤ **fork server↔fork addon 端到端**：up_to_date true/协议 7/7/addon [1,7]/get_scene_info 实时/视口截图 image/png 346KB——addon 侧 by-exclusion 证明（上游 addon 会话内停用）；验证中发现并记录两条架构事实：--python 路径含全角字符解析失败、驱动脚本在 Blender 主线程 sleep 会堵死命令队列（timer 架构约束），v2.5.1 落 10/09 分册） |
 | — | 遗留项状态以各行自带标记表达；台账不设"无遗留"类绝对化断言（F-83 治本） | — | — |
 

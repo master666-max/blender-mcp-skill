@@ -1,4 +1,4 @@
-# INSTALL — blender-mcp skill 安装说明（v2.5.9）
+# INSTALL — blender-mcp skill 安装说明（v2.6.0）
 
 > 面向 AI 编码代理（ZCode / Claude Code / Cursor / Codex 等）的 Blender 实时操控技能包。
 > 让代理通过 blender-mcp 直连真实运行的 Blender：建模、材质、几何节点、灯光相机、渲染出图、
@@ -138,6 +138,17 @@ DSH 的 MCP **不走配置文件键**（`settings.yaml` 里配了也没用），
 `mcp__blender__*`（2.0.0 工具全量），`get_addon_status` 复验通过。
 ④ **旧命令名兼容**：2.0.0 的 CLI 入口只有 `mcp-for-blender`——若客户端配置仍指向
 `blender-mcp.exe`，用 `mcp-for-blender.exe` 复制覆盖该路径即可（本机已这样做并实测可用）。
+
+### 发行签名与验签（v2.6.0 起，B1）
+
+发行 zip 附 SSH 签名（`*.zip.sig`，命名空间 `blender-mcp`，签名公钥与 allowed_signers
+在 `assets/release-signing/`）。**哈希只防损坏、不防投毒**（分发页可同时换掉件与哈希），
+签名才能锚定"这份包出自作者密钥"。验签（任一台有 ssh-keygen 的机器）：
+
+```bash
+ssh-keygen -Y verify -f assets/release-signing/allowed_signers   -I blender-mcp-releases -n blender-mcp -s <发行包>.zip.sig < <发行包>.zip
+# 输出 "Good "blender-mcp" signature" 即通过
+```
 
 服务端离线安装（默认通道）：`pip install assets/brickfly-mcp-bundle/brickfly_mcp-2.0.0-py3-none-any.whl`
 （回退上游通道：`assets/blender-mcp-bundle/mcp_for_blender-2.0.0-py3-none-any.whl`；

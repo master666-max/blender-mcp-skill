@@ -257,10 +257,10 @@ def check_ledger_invariants(md, skill_version):
     problems = []
     ledger = open(md, encoding="utf-8").read()
     # F-161：台账集登记断言——增删台账行须同步修改此数（刻意的登记动作）
-    EXPECTED_LEDGER_ROWS = 136
+    EXPECTED_LEDGER_ROWS = 138
     loose = len(re.findall(r"^\| F-\S+ \|", ledger, re.M))
     if loose != EXPECTED_LEDGER_ROWS:
-        problems.append("台账集登记断言失败: 台账 F 行=%d（期望 %d）——台账行可能被静默增删（F-161）"
+        problems.append("LEDGER-SET CHECK FAIL: 台账 F 行=%d（期望 %d）——台账行可能被静默增删（F-161；ASCII 标签供探针判定，F-166）"
                         % (loose, EXPECTED_LEDGER_ROWS))
     keys = re.findall(r"^\| F-(\d+)([a-z]?) \|", ledger, re.M)
     pairs = [(int(n), sfx) for n, sfx in keys]
@@ -293,7 +293,7 @@ def main():
         print("NO ROWS PARSED — 表格解析失败")
         sys.exit(2)
     # F-159：条款集登记断言——删行/缩表不再静默（新增/删除条款须同步改此数，属刻意的登记动作）
-    EXPECTED_CLAUSES = 86
+    EXPECTED_CLAUSES = 89
     ids = [r["no"] for r in rows]
     if len(rows) != EXPECTED_CLAUSES or ids != list(range(1, EXPECTED_CLAUSES + 1)):
         print("CLAUSE-SET CHECK FAIL: 条款数=%d（期望 %d）或编号非 1..%d 连续——条款行可能被静默增删（F-159）"
