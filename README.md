@@ -93,6 +93,17 @@ flowchart LR
 
 用的时候一条命令就够：`py -X utf8 scripts/exp_hint.py 关键词 …` 会把相关的教训（连"规避法"和复算命令）直接列出来；没命中就照实说没命中，不硬凑。skill 自身也把"开工前先扫一遍经验区"写成了每次任务的固定第一步。
 
+```bash
+# 经验区速查（装了就能用，零依赖）
+py -X utf8 scripts/exp_hint.py                  # 列出全部教训条目
+py -X utf8 scripts/exp_hint.py 烘焙 方向          # 按任务关键词查相关教训（命中的先读"规避法"再动手）
+
+# 可选增强：本地账本（首次跑一遍；之后检索会带上"谁查过什么"的留痕。账本只在你机器上，不入发行包）
+py -X utf8 experience/engine/evo_seat.py init experience/state/evo.db --level G3
+py -X utf8 experience/engine/exp_bridge.py import experience/state/evo.db
+py -X utf8 scripts/exp_hint.py --engine 烘焙 方向 # 走账本版检索（未初始化会自动回退到上面那条）
+```
+
 ## 一个任务从头到尾
 
 1. **对齐规格**——"建栋现代别墅"会换来几个具体问题：多大？几层？要不要泳池？什么氛围？（小任务自动用默认值。）
