@@ -5,8 +5,14 @@
   py -X utf8 scripts/exp_hint.py                  # 列全部条目（一行一条）
   py -X utf8 scripts/exp_hint.py 烘焙 方向         # 按关键词出命中清单（含量化与复算命令）
   py -X utf8 scripts/exp_hint.py --top 3 导出 glb
+  py -X utf8 scripts/exp_hint.py --engine 烘焙 方向 # 走引擎检索（账本需已 init + 桥导入）
 
-口径：只读 experience/EXP-*.md（**不读引擎账本**——账本是运行态，不入包，换机即无）；
+两条通路（**缺省永不依赖引擎**）：
+  · 文件扫（缺省）：只读 experience/ 下 EXP 条目——零安装，换机/未初始化都能用；
+  · 引擎检索（--engine）：代跑 experience/engine/evo_seat.py retrieve——多**命中留痕**
+    （谁查过什么入账，可审计）与 last_used 账面刷新；**账本未初始化时自动回退文件扫**。
+    口径如实：本区条目全部为 procedural（零衰减），故引擎的「类型衰减排序」在本区
+    **无区分度**（各条衰减乘数同为 0）——engine 通路在本区的真实增益 = 命中留痕 + 分词打分。
 命中=关键词出现次数加权（id/一句话/claims 权 3，规避法/现象正文权 2，其余权 1）；
 同分按编号序。**无命中照实说「无命中」、不虚构相关条目**（宁缺勿编）。
 """
@@ -14,10 +20,25 @@ import argparse
 import glob
 import os
 import re
+import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXP_DIR = os.path.join(ROOT, "experience")
+ENGINE = os.path.join(EXP_DIR, "engine", "evo_seat.py")
+LEDGER = os.path.join(EXP_DIR, "state", "evo.db")
+
+
+def engine_retrieve(query, k):
+    """走引擎检索（命中留痕+last_used 刷新）。返回 (ok, 输出文本)。"""
+    if not os.path.isfile(ENGINE) or not os.path.isfile(LEDGER):
+        return False, ("引擎账本未初始化（缺 %s）——先按 experience/engine/README.md 的"
+                       " init + 桥导入建库，本次回退文件扫。" % LEDGER)
+    p = subprocess.run([sys.executable, "-X", "utf8", ENGINE, "retrieve", LEDGER, query, "-k", str(k)],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if p.returncode != 0:
+        return False, "引擎检索失败（exit %d）：%s" % (p.returncode, (p.stderr or "").strip()[:200])
+    return True, (p.stdout or "").strip()
 
 
 def parse_entry(path):
@@ -60,6 +81,8 @@ def main():
     ap = argparse.ArgumentParser(description="经验区检索：给任务关键词，出命中清单")
     ap.add_argument("keywords", nargs="*", help="任务关键词（可多个；留空=列全部）")
     ap.add_argument("--top", type=int, default=5, help="命中清单条数上限（默认 5）")
+    ap.add_argument("--engine", action="store_true",
+                    help="走引擎检索（多命中留痕+last_used；账本未初始化则回退文件扫）")
     a = ap.parse_args()
     if not os.path.isdir(EXP_DIR):
         print("ERROR: 未找到经验区目录 experience/（包结构异常）")
@@ -77,6 +100,18 @@ def main():
             print("  %-8s [%s]%s %s" % (e["id"], e["status"], pad, clip(e["one"], 64)))
         print("用法：py -X utf8 scripts/exp_hint.py <任务关键词…>")
         return
+    if a.engine:
+        ok, out = engine_retrieve(" ".join(a.keywords), a.top)
+        if ok:
+            print("引擎检索（命中留痕已入账；-k %d）：" % a.top)
+            print(out if out else "（引擎无输出）")
+            print()
+            print("—— 以下文件扫为对照（引擎=分词打分+留痕；文件扫=子串加权，零依赖）——")
+        else:
+            print("engine 通路不可用：" + out)
+            print("—— 回退文件扫 ——")
+    elif os.path.isfile(LEDGER):
+        print("（检测到引擎账本：加 --engine 可用命中留痕/last_used；账本=运行态，不入包）")
     ranked = sorted(((score(e, a.keywords), e) for e in entries),
                     key=lambda t: (-t[0], t[1]["id"]))
     hits = [(s, e) for s, e in ranked if s > 0][: a.top]
