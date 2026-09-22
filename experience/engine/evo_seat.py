@@ -21,11 +21,13 @@
 """
 import argparse, ast, datetime, fnmatch, json, os, re, sqlite3, sys, time, unittest
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 # 变更记录（版本纪律：破坏性变更必升版本+声明算法版本）：
 #   0.1.0  初版（哈希 v1：只覆盖 payload）
 #   0.2.0  哈希 v2（actor/kind 并入——老库不可读，需重建）+SPEC v1 吸收+
 #          framework_sha 对账+升档文案修正
+#   0.2.1  framework_sha 判别力修复（横幅定位+长度断言——原实现只哈希 66 字节，
+#          blender 线实测 CONFIRMED 判别力近零）+哈希键兼容试算
 HASH_ALGO = "v2"
 SPEC = "SPEC-内核接口与宿主契约-v1"   # 本文件实现的规范版本（符合性套件可验）
 GOVERNANCE_BOUNDARY = "验收/裁决/修宪不入内核（执行无权自宣验收）——治理位外置"
@@ -75,13 +77,21 @@ def event_hash(prev_hash: str, payload, actor: str = "", kind: str = "") -> str:
 GENESIS = "0" * 64
 
 def framework_sha() -> str:
-    """§F 副本对账：框架段哈希（§1 core…§6 gates 文本段）——合并形态副本与权威版对账用。"""
-    src = open(os.path.abspath(__file__), encoding="utf-8").read()
-    a = src.find("§1 core")
-    b = src.find("§7 cli")
-    if a < 0 or b < 0: return ""
+    """§F 副本对账：框架段哈希（§1 core…§6 gates）。
+    定位=区段横幅行（含 ═ 装饰），**不**用裸 find（会落在文件头区段名清单上）；
+    最小长度断言 fail-closed（防静默产坏值）。
+    v0.2.1 修复（blender 线实测 CONFIRMED）：原实现只哈希 66 字节、对框架码
+    偏离零判别力——修后基线值见 SPEC §F/conformance 判别力测试。"""
     import hashlib
-    return hashlib.sha256(src[a:b].encode("utf-8")).hexdigest()[:16]
+    import re as _re
+    src = open(os.path.abspath(__file__), encoding="utf-8").read()
+    a = _re.search(r"^# ═+ §1 core", src, _re.M)
+    b = _re.search(r"^# ═+ §7 cli", src, _re.M)
+    if not (a and b): raise EvoError("framework_sha：区段横幅未命中（文件结构异常）")
+    seg = src[a.start():b.start()]
+    if len(seg) < 5000:
+        raise EvoError(f"framework_sha：框架段仅 {len(seg)} 字节 <5000 下限（拒绝静默坏值）")
+    return hashlib.sha256(seg.encode("utf-8")).hexdigest()[:16]
 _HEX = re.compile(r"^[0-9a-f]{64}$")
 _ACTOR = re.compile(r"^(llm|fallback|human|ci|engine):[^\s]+$")
 
@@ -472,9 +482,21 @@ class TestEvolution(unittest.TestCase):
 NOW_T = datetime.datetime(2026, 9, 23, 12, 0, 0)
 
 class TestSelf(unittest.TestCase):
+    def test_framework_sha_discriminates(self):
+        # 判别力不变量（v0.2.1 修复配套）：框架段改动 → framework_sha 必变
+        import hashlib, re as _re, tempfile
+        src = open(os.path.abspath(__file__), encoding="utf-8").read()
+        a = _re.search(r"^# ═+ §1 core", src, _re.M)
+        b = _re.search(r"^# ═+ §7 cli", src, _re.M)
+        self.assertTrue(a and b, "区段横幅可定位")
+        seg = src[a.start():b.start()]
+        self.assertGreater(len(seg), 5000, "框架段长度下限（防 docstring 误切）")
+        h1 = hashlib.sha256(seg.encode()).hexdigest()[:16]
+        h2 = hashlib.sha256(seg.replace("append-only: 禁 UPDATE", "X", 1).encode()).hexdigest()[:16]
+        self.assertNotEqual(h1, h2, "破坏框架段必须改变哈希（判别力）")
     def test_version_and_algo_declared(self):
         # 版本纪律：破坏性变更必升版本+算法版本声明
-        self.assertEqual(VERSION, "0.2.0")
+        self.assertEqual(VERSION, "0.2.1")
         self.assertEqual(HASH_ALGO, "v2")
     def test_self_source_scan_has_no_host_words(self):
         # 自包含不变量：源码不含宿主名（断言用拼接避开自指）

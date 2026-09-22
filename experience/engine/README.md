@@ -1,30 +1,35 @@
 # 演化引擎（evo-seat 微型内核）— 经验区的对接层
 
 > **来源**：审计区设计并实现（`D:/zcode-workspace-audit/`），
-> `evo_seat.py` **v0.2.0**（**版本纪律版**：SPEC 对齐 + 哈希算法声明 + 老库拒读语义），
-> vendored **逐字节未改**。
-> sha256 = `403d79a4e2fc9233451d78acec1a539534ccd524cd71d1e609cad5e27cea0fbb`
+> `evo_seat.py` **v0.2.1**（**framework_sha 判别力修复版**：横幅定位 + 长度断言 +
+> 判别力测试；SPEC 对齐 / 版本纪律 / 老库拒读语义承前），vendored **逐字节未改**。
+> sha256 = `096077ce061c185016398f8e0d94f92d5b588593db95ddda48cc12329af05ba6`
 > （升级时替换此文件并更新本行哈希 + 指纹 #92；配套映射见下，桥接脚本 `exp_bridge.py`）。
-> 上一版 = `43f8db8f…`（v2.8.1 换装 SPEC 对齐版；首发 `61a808be…`，见 CHANGELOG）。
+> 上一版 = `403d79a4…`（v2.8.2 换装版本纪律版 v0.2.0；更早 `43f8db8f…` / `61a808be…`，
+> 见 CHANGELOG）。
 >
-> **v2.8.2 换装（上游 v0.2.0，版本纪律版）**：`VERSION`/`HASH_ALGO` 常量与**变更记录**
-> 入档（0.1.0=v1 哈希只覆盖 payload；0.2.0=**v2 哈希把 actor/kind 并入输入**——老算法库
-> open **拒绝并要求按事件流重建**，破坏性变更升版本+声明算法）；SCHEMA 增 `meta.hash_algo`
-> 键；缺键的在途 v2 库按「首行试算」自动识别补键放行（不误杀不静默）；新增内嵌断言
-> `test_version_and_algo_declared`（selftest 9 → 10 测）。本包账本为 v2 算法，
-> **换装后旧账本向下兼容复验过**（28 事件链完整）。
+> **v2.8.3 换装（上游 v0.2.1，判别力修复）**：原 `framework_sha()` 用 `src.find("§1 core")`
+> 取**首个命中**，落在文件头 docstring 的区段名清单上（只哈希 66 字节）——对框架码偏离
+> 零判别力（本包 v2.8.2 轮实测发现并报出，审计区独立复现后修复）；现改为**横幅行正则
+> 定位**（`^# ═+ §1 core` → `^# ═+ §7 cli`）+ **<5000B fail-closed 抛错**；内嵌
+> `test_framework_sha_discriminates`（selftest 10 → 11 测）；审计区 **conformance §F
+> 从「字段在位」升级为判别力测试**（破坏副本对跑，两侧同值即 FAIL——本包实测：真件
+> 14/14 PASS、回退件 13/14 FAIL）。
+> **新基线：`framework_sha = a98f559753d7cbe0`（框架段长 13,297 B，独立复算一致）**。
+> 对账口径（采纳上游回执 §四）：**段哈希为主**（区分「框架升级」与「宿主段改动」）
+> + **整文件 sha256 为投递校验**（本 README 首部登记值 + 指纹 #92）。
+>
+> **残留守卫洞（本包回执核对实测；已回报上游，待 v0.2.2）**：① 内嵌判别力测试为
+> **本地复算**、不调用 `framework_sha()` 本体——把函数回退成旧实现后该测试仍 11 测
+> 全过（隔离目录实测），**真守卫是 conformance §F**；② `selftest` 用目录发现
+> （`pattern="evo_seat.py"`），**重命名副本会静默测到邻文件**（实测：污染目录里回退件
+> 跑出「9 测 OK」，实为另一旧文件的测试）；③ `selftest` 失败时**退出码仍 0**
+> （fail-closed 违背，脚本化判定须读输出文本）。三处修法各约一行，见研究仓
+> `研究/回执核对-framework_sha修复_20260923.md`。
 >
 > **既有（v2.8.1 SPEC 对齐，保留）**：`SPEC = SPEC-内核接口与宿主契约-v1` 符合性声明 +
 > **治理位边界**（验收/裁决/修宪**不入内核**——执行无权自宣验收，治理位永远外置）；
-> `audit` 增 [符合]/[边界] 行；`verify`/`audit` 顺带输出 `framework_sha`
-> （实跑值 `89adf037485b4148`）。
->
-> **上游已知边界（本包实测；不在本包修——vendor 逐字节原则）**：`framework_sha()` 的
-> 切片是 `src.find("§1 core")` 的**首个命中**——落在文件头 docstring 的区段名清单上
-> （实测 66 字节），**框架代码改动不改变该值**（改动-对照实测：破坏 §2 store 内代码后
-> 仍输出 `89adf037485b4148`）。即该字段**在位但判别力近零**，SPEC §F 的 T-E 副本对账
-> 目前请改用**整文件 sha256**（＝本 README 首部登记值 + 指纹 #92，锚定逐字节）。
-> 已报出，待上游按修宪程序处置。
+> `audit` 增 [符合]/[边界] 行；`verify`/`audit` 顺带输出 `framework_sha`。
 
 ## 它是什么
 
@@ -50,7 +55,7 @@ lifecycle→store→core）。经验区（`experience/`）是它的**轻宿主**
 
 ```bash
 cd experience/engine
-py -X utf8 evo_seat.py selftest                 # 内嵌测试（10 测）
+py -X utf8 evo_seat.py selftest                 # 内嵌测试（11 测）
 py -X utf8 evo_seat.py init ../state/evo.db --level G3
 py -X utf8 evo_seat.py verify ../state/evo.db
 py -X utf8 evo_seat.py gate ../state/evo.db evo_seat.py   # 质量门自食
