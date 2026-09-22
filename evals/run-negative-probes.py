@@ -62,6 +62,9 @@ PROBES = [
     ('P-NEXP 经验区状态值破坏', 'experience/EXP-001.md',
      'status: promoted',
      'status: archived-bogus', None, 'EXP-ZONE CHECK FAIL', 4),
+    ('P-N93 删经验区开工前步（SKILL §0）', 'SKILL.md',
+     '5. **开工前扫经验区（U-09，每次任务必做）**：',
+     None, 93, None, 1),
 ]
 
 

@@ -349,7 +349,7 @@ def main():
         print("NO ROWS PARSED — 表格解析失败")
         sys.exit(2)
     # F-159：条款集登记断言——删行/缩表不再静默（新增/删除条款须同步改此数，属刻意的登记动作）
-    EXPECTED_CLAUSES = 92
+    EXPECTED_CLAUSES = 95
     ids = [r["no"] for r in rows]
     if len(rows) != EXPECTED_CLAUSES or ids != list(range(1, EXPECTED_CLAUSES + 1)):
         print("CLAUSE-SET CHECK FAIL: 条款数=%d（期望 %d）或编号非 1..%d 连续——条款行可能被静默增删（F-159）"

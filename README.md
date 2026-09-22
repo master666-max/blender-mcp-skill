@@ -1,6 +1,6 @@
 # blender-mcp-skill
 
-[![Version](https://img.shields.io/badge/version-2.8.3-blue)](https://github.com/master666-max/blender-mcp-skill/releases)
+[![Version](https://img.shields.io/badge/version-2.9.0-blue)](https://github.com/master666-max/blender-mcp-skill/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#许可与出处)
 [![Blender](https://img.shields.io/badge/Blender-5.2_LTS-orange)](https://www.blender.org)
 [![Platform](https://img.shields.io/badge/platform-Windows_·_macOS_·_Linux-lightgrey)](#上手三步)
@@ -91,6 +91,8 @@ flowchart LR
 
 **8. 会攒记性的经验区**——包内 `experience/` 收的是任务的实战教训，随包分发：每条都带**证据三件套**（现场产物 + 当时原话 + 一条能复算的命令），**只增不改**。下次遇到同类问题，按关键词就能把相关小结捞出来用，不必重新踩一遍坑。往里加新经验**不需要重新发版**；只有把某条经验正式升格进说明书（分册）时，才过人 + 发版——自动积累的东西，永远不会悄悄改掉给你的承诺。
 
+用的时候一条命令就够：`py -X utf8 scripts/exp_hint.py 关键词 …` 会把相关的教训（连"规避法"和复算命令）直接列出来；没命中就照实说没命中，不硬凑。skill 自身也把"开工前先扫一遍经验区"写成了每次任务的固定第一步。
+
 ## 一个任务从头到尾
 
 1. **对齐规格**——"建栋现代别墅"会换来几个具体问题：多大？几层？要不要泳池？什么氛围？（小任务自动用默认值。）
@@ -160,7 +162,7 @@ cp -r blender-mcp-skill ~/.zcode/skills/blender-mcp
 | `SKILL.md` | **AI 入口**（Agent Skills 标准）：开工自检、七条铁律、需求路由表、恢复 SOP |
 | `INSTALL.md` | 安装：三步、多客户端路径表、离线安装、发行验签、升级回滚 |
 | `references/00~14` | **14 分册手册**：需求澄清/场景/材质/灯光渲染/动画物理/几何节点/资产库/网格体检/参数化/安全报错/无头 CI/部署安全/执行契约/建模工艺/视觉工作流 |
-| `scripts/` | 建模五段式骨架、场景体检、三点布光、渲染回读 |
+| `scripts/` | 建模五段式骨架、场景体检、三点布光、渲染回读、经验检索（`exp_hint.py`） |
 | `fragments/` `nodes/` | 代码积木库与节点组库 |
 | `assets/` | 双离线安装包（默认通道 + 回退通道，含校验和、签名公钥、来源说明） |
 | `evals/` | 体检工具：92 条规则回归 runner + 10 条反向破坏探针自检（`--repeat` 统计）+ 基线归档 |

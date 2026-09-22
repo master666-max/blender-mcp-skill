@@ -15,7 +15,7 @@ description: >
   references/10-headless-ci.md。
 metadata:
   author: misdeep
-  version: "2.8.3"
+  version: "2.9.0"
   verified_on: "Blender 5.2.1 LTS + brickfly-mcp 2.0.0 (skill fork, 31 tools) + addon v1.7 (protocol 7), Windows, 中文UI"
 ---
 
@@ -63,6 +63,10 @@ Blender 5.2.1 LTS + 插件 v1.6 + Windows 中文 UI 上真机验证过；【文�
    多模态能力，视觉通道默认开启**；通道不可用 = 环境降级：开场即告知用户"质量保障降级"、
    后续宣告行标 △、高视觉依赖工序与用户协商（权威定义：14 分册 §1/§6）。
 4. `get_scene_info` 报错/超时 → 走 §6 恢复 SOP，**不要盲目重试**。
+5. **开工前扫经验区（U-09，每次任务必做）**：跑 `py -X utf8 scripts/exp_hint.py <任务关键词>`
+   （多个关键词空格分隔；无参数=列全部条目）——**命中条目先读其"规避法"再动手**；
+   没有命中就照常开工（工具会照实说"无命中"，不虚构相关）。全量索引与晋升去向见
+   `experience/INDEX.md`；教训回填与读取纪律见 [12 分册 §7](references/12-brickfly-protocol.md)。
 
 ## 0.5 需求澄清（PRD 反问循环——模糊建模任务的入口）
 
@@ -129,6 +133,7 @@ G1 铁门禁不可省略，静默跳过 = 任务未完成。
 
 | 用户想要 | 先读 | 关键事实速记 |
 |---|---|---|
+| **任何实作任务（开工前，先于本表其余行）** | `py -X utf8 scripts/exp_hint.py <任务关键词>` → 命中条目先读（全量索引 `experience/INDEX.md`） | 实战教训先读再做（U-09）；回填/晋升规则见 12 分册 §7 |
 | 建物体/集合/变换/修改器 | [01-scene-objects.md](references/01-scene-objects.md) | ops 建物落活动集合；data API 免上下文；布尔用 `FLOAT` 求解器 |
 | 材质/贴图/程序化材质 | [02-materials.md](references/02-materials.md) | 5.2 Principled = 32 输入（含 `Weight`/`Thin Wall`）；Mix 节点 RGBA 用 inputs[6]/[7] |
 | 灯光/相机/构图/渲染出图 | [03-light-camera-render.md](references/03-light-camera-render.md) | 三点光 Area 150/40/100W；50mm+f/2.8 DOF+TRACK_TO；EEVEE 引擎 ID 5.x 是 `BLENDER_EEVEE`；渲染隔离见 §6 |
