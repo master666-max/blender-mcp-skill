@@ -21,7 +21,12 @@
 """
 import argparse, ast, datetime, fnmatch, json, os, re, sqlite3, sys, time, unittest
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
+# 变更记录（版本纪律：破坏性变更必升版本+声明算法版本）：
+#   0.1.0  初版（哈希 v1：只覆盖 payload）
+#   0.2.0  哈希 v2（actor/kind 并入——老库不可读，需重建）+SPEC v1 吸收+
+#          framework_sha 对账+升档文案修正
+HASH_ALGO = "v2"
 SPEC = "SPEC-内核接口与宿主契约-v1"   # 本文件实现的规范版本（符合性套件可验）
 GOVERNANCE_BOUNDARY = "验收/裁决/修宪不入内核（执行无权自宣验收）——治理位外置"
 
@@ -103,6 +108,7 @@ CREATE TRIGGER IF NOT EXISTS no_delete BEFORE DELETE ON events
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL);
 INSERT OR IGNORE INTO meta (k, v) VALUES ('level', 'G1');
 INSERT OR IGNORE INTO meta (k, v) VALUES ('schema_version', '1');
+INSERT OR IGNORE INTO meta (k, v) VALUES ('hash_algo', 'v2');
 """
 
 class Store:
@@ -113,11 +119,32 @@ class Store:
     def open(cls, path: str) -> "Store":
         pre = os.path.isfile(path)
         conn = sqlite3.connect(path, isolation_level=None)
-        if pre: cls._require_triggers(conn)   # 既有库先验（防 IF NOT EXISTS 静默重建掩盖）
+        if pre:
+            cls._require_triggers(conn)      # 既有库先验（防 IF NOT EXISTS 静默重建掩盖）
+            cls._require_hash_algo(conn)     # 老算法库先拒（防 SCHEMA 补键掩盖——同族教训）
         conn.executescript(SCHEMA)
         s = cls(conn)
-        if s.level_index() >= 1: s.verify()   # G1+ 开库即验
+        if s.level_index() >= 1: s.verify()  # G1+ 开库即验
         return s
+
+    @staticmethod
+    def _require_hash_algo(conn):
+        """老算法库拒（v0.2.0 破坏性变更）。缺键不误杀：首行试算自动识别——
+        v2 试算命中 ⇒ 在途库，补键放行；试算失败 ⇒ v1 或损坏，拒并提示重建。"""
+        has = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='meta'").fetchone()
+        has_events = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='events'").fetchone()
+        if not (has and has_events): return
+        row = conn.execute("SELECT v FROM meta WHERE k='hash_algo'").fetchone()
+        if row and row[0] == HASH_ALGO: return
+        first = conn.execute(
+            "SELECT actor,kind,prev_hash,payload,self_hash FROM events ORDER BY seq LIMIT 1").fetchone()
+        if first and event_hash(first[2], __import__("json").loads(first[3]), first[0], first[1]) == first[4]:
+            conn.execute("INSERT OR IGNORE INTO meta (k, v) VALUES ('hash_algo', ?)", (HASH_ALGO,))
+            return  # 在途 v2 库（键缺失晚于算法切换）：自动识别放行+补键
+        if first:
+            raise EvoError(
+                f"老库（哈希算法 {(row[0] if row else 'v1')} ≠ 现版 {HASH_ALGO}）：不可读，请按事件流重建"
+                f"（v0.2.0 为破坏性变更，见版本变更记录）")
 
     @staticmethod
     def _require_triggers(conn):
@@ -445,6 +472,10 @@ class TestEvolution(unittest.TestCase):
 NOW_T = datetime.datetime(2026, 9, 23, 12, 0, 0)
 
 class TestSelf(unittest.TestCase):
+    def test_version_and_algo_declared(self):
+        # 版本纪律：破坏性变更必升版本+算法版本声明
+        self.assertEqual(VERSION, "0.2.0")
+        self.assertEqual(HASH_ALGO, "v2")
     def test_self_source_scan_has_no_host_words(self):
         # 自包含不变量：源码不含宿主名（断言用拼接避开自指）
         src = open(os.path.abspath(__file__), encoding="utf-8").read()
