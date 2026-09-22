@@ -34,8 +34,10 @@
 > 实测删除探针；M14 = 台账跨版完整性比对；Pn = 反向实测探针编号（与 docs/ 工单阶段号
 > P0~P6 无关）。
 > **发布闸附加自检（v2.5.5 起，F-156 治本）**：`py evals/run-negative-probes.py` ——
-> M13 反向探针集随包自检（7 破坏探针 + 正例对照），建议与 ①查 同跑；稳态宣告条件
+> M13 反向探针集随包自检（建议 `--repeat 2`），与 ①查 同跑；稳态宣告条件
 > （HANDOFF §九）引用之。`re:` 条款另有恒真 lint 内建于 runner（F-155）。
+> **基线归档（v2.7.0 起，外部借鉴 B3）**：发版时把 ①查/②查/M13 自检输出存
+> `evals/baselines/`（按版本命名），供跨版趋势对比（EDD 基线对比惯例）。
 
 > 用途：**条款级回归测试**——skill 每次改版后，用指纹逐条确认关键条款仍在位。
 > 与 eval-queries.json（触发评测）互补：那个测"会不会被激活"，这个测"条款有没有被改坏"。
@@ -135,6 +137,8 @@
 | 87 | v2.6.0 INSTALL 发行验签命令（B1 签名；被探针 P-N87 守护） | 字面量 | `ssh-keygen -Y verify` | INSTALL.md |
 | 88 | v2.6.0 11 分册行业安全基线对照附录（B6/B7） | 字面量 | `行业安全基线对照与威胁案例` | references/11 |
 | 89 | v2.6.0 14 分册目验判据验证器规范（B4 校准） | 字面量 | `目验判据的验证器规范` | references/14 |
+| 90 | v2.7.0 12 §7 经验区指路（U-07：新增教训先落 experience/，晋升后回填） | 字面量 | `新增教训请先落` | references/12 |
+| 91 | v2.7.0 经验区账本活区声明（U-07：只增不改/快照时点/引擎只写 draft） | 字面量 | `源根条目可随时追加` | experience/INDEX.md |
 
 ## 遗留项台账（低危缓办项追踪——防静默遗失，v1.9.2 起设立）
 
@@ -288,6 +292,7 @@
 | F-165 | 「已修复」行声称的措施未落地：①查 定义句并未补 EXPECTED_LEDGER_ROWS（声称两处：CHANGELOG v2.5.9 条目 + F-163 台账行处置栏；实测定义句与 v2.5.8 逐字节相同、全文 EXPECTED_LEDGER_ROWS 仅出现在 3 条台账行）——虚报家族第 5 次同形；**根因未确认**（编辑命令自报成功但未持久） | v2.6.0 | ✅ 已修复（定义句改为并列两项：「…须同步 `EXPECTED_CLAUSES`（违反 exit 2）与 `EXPECTED_LEDGER_ROWS`（违反 exit 3）——F-159/F-161」；编辑后 grep 回读验证 4 处在位——F-165 教训的执行形态） |
 | F-166 | P-NL161 期望标记改泛用 ASCII `LEDGER-INVARIANT` 后判定特异性不足：④a/④b 任一台账不变量报错都打印该前缀——「条目提及 F-100 且断言被移除」场景实测假通过（三场景对照） | v2.6.0 | ✅ 已修复（双改：runner 台账集断言加 ASCII 标签 **`LEDGER-SET CHECK FAIL`**（与条款集断言的 `CLAUSE-SET CHECK FAIL` 同形）；P-NL161 改判该标签——恢复与断言一一对应的特异性，端到端实测触发） |
 | U-06 | 外部借鉴调研（10 组检索 8 维度：MCP 安全/Skills 标准/供应链/Blender 生态/评估方法学/EDD/SDD/验证器论文）落地 6 项：**B1** 发行 zip SSH 签名（ed25519，minisign 式 allowed_signers，哈希只防损坏签名才防投毒）+ INSTALL 验签节 + 指纹 #87；**B2** 探针 --repeat pass^k 式触发率统计（借鉴 tau-bench）；**B4** 14 分册目验判据验证器规范（对照 arXiv 2026-04 Verifiers 论文）；**B5** 00 分册敷衍④补 Stechly《Self-Verification Limitations》学术引用；**B6** 11 分册行业安全基线对照附录；**B7** 恶意技能威胁案例附录。B8/B9/B10 登记于 research-hub 本线「借鉴登记_20260921」（包外件，稳态后解锁） | v2.6.0 | ✅ 已落地（指纹 **#87~#89** 配套；细节见 CHANGELOG v2.6.0 条目与本线借鉴登记件（包外）） |
+| U-07 | 用户令"开干"：经验区落地（设计稿见工作区 _经验区设计拟稿_v1.md，治理主张全数采纳）——包内新目录 experience/（INDEX 账本只增不改 + EXP-001~014 迁移自 BMCP-ERR-001~014，编号映射见各条 legacy）；runner 增 **EXP 区结构校验**（exit 4：frontmatter 必填键/证据三件套/状态合法值/promotion 完整性/INDEX 覆盖——活区管结构不管数量）；探针 **P-NEXP**（状态值破坏→EXP-ZONE CHECK FAIL exit 4）；12 §7 表尾指路；指纹 **#90/#91**；治理主张=活区追加不触发发版、晋升进分册才是规则变更、演化引擎（self-evolving-kb v1.0.0）只写 draft 晋升过人+发版门 | v2.7.0 | ✅ 已落地（细节见 CHANGELOG v2.7.0 条目；设计稿副本同步 research-hub 本线 研究/） |
 | U-05 | 用户令"开干，解耦上游"（可行性报告见工作区文件《_blender_skill_上游解耦可行性报告_20260920.md》，裁定 S1 收编）：vendor 上游 2.0.0 全量源码为自有通道 **brickfly-mcp**（MIT，仅身份字段改写——发行名/入口/FastMCP 名/addon 文件名与 bl_info 名/用户引导文本，**协议 7、31 工具、安全模式、五库逻辑逐字节不动**；parity 差异集中在 8 个文件 + addon 10 行、逐行核对全为身份行，可复算口径 git diff --no-index --numstat，F-145 勘误），默认通道切换、上游通道保留为回退、双通道互斥启用纪律入 11 分册 §1.4、版本期望值围栏入 SKILL §0（#81/#82 锁定） | v2.5.0 | ✅ 已落地（**验证链**：① parity diff=仅身份行；② wheel dist-info 手术构建+RECORD 自检；③ uv tool install 与上游 2.0.0 并存；④ stdio 直驱 initialize=BrickflyMCP/tools/list=31；⑤ **fork server↔fork addon 端到端**：up_to_date true/协议 7/7/addon [1,7]/get_scene_info 实时/视口截图 image/png 346KB——addon 侧 by-exclusion 证明（上游 addon 会话内停用）；验证中发现并记录两条架构事实：--python 路径含全角字符解析失败、驱动脚本在 Blender 主线程 sleep 会堵死命令队列（timer 架构约束），v2.5.1 落 10/09 分册） |
 | — | 遗留项状态以各行自带标记表达；台账不设"无遗留"类绝对化断言（F-83 治本） | — | — |
 

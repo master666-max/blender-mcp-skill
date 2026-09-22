@@ -12,6 +12,8 @@ frontmatter 版本不可解析时，一律计入 problems → 退出码 3，不�
 退出码表：0 = 全过；1 = 指纹 FAIL；2 = 表格解析失败**或条款集登记断言失败**
 （EXPECTED_CLAUSES，F-159）；3 = 台账断言 FAIL（④a/④b/④c，含不可核验）
 **或台账集登记断言失败**（EXPECTED_LEDGER_ROWS，F-161）。
+4 = 经验区（experience/）结构校验失败（U-07：frontmatter 必填键/出处三件套/
+状态合法值/promotion 完整性/INDEX 覆盖——活区管结构不管数量）。
 
 用法（在 skill 根目录或任意位置）：
     py evals/run-regression-checks.py
@@ -242,6 +244,57 @@ def check_ledger_file_refs(md, root):
     return problems
 
 
+
+
+def check_experience_zone(root):
+    """U-07（v2.7.0）：经验区（experience/）结构校验——活区管结构不管数量。
+
+    校验：INDEX 存在；每条 EXP-*.md frontmatter 必填键齐全（id/date/source/status/
+    evidence/claims/recalc-judge）；status 为合法值；evidence 三件套（artifact/quote/
+    recalc）非空；promoted 条目必须有 promotion.target；supersedes（如有）指向存在
+    条目；INDEX 覆盖每条 id。返回问题列表。
+    """
+    import glob as _g
+    problems = []
+    zone = os.path.join(root, "experience")
+    index_path = os.path.join(zone, "INDEX.md")
+    if not os.path.isfile(index_path):
+        return ["EXP-ZONE CHECK FAIL: experience/INDEX.md 缺失（U-07）"]
+    legal = {"draft", "verified", "promoted", "pending", "rejected"}
+    entries = sorted(_g.glob(os.path.join(zone, "EXP-*.md")))
+    ids = set()
+    for path in entries:
+        fid = os.path.basename(path)
+        text = open(path, encoding="utf-8").read()
+        if not text.startswith("---"):
+            problems.append("EXP-ZONE CHECK FAIL: %s 缺 frontmatter" % fid)
+            continue
+        head = text.split("---", 2)[1]
+        for key in ("id:", "date:", "source:", "status:", "evidence:", "claims:", "recalc-judge:"):
+            if key not in head:
+                problems.append("EXP-ZONE CHECK FAIL: %s 缺必填键 %s" % (fid, key))
+        m = re.search(r"status:\s*(\S+)", head)
+        if m and m.group(1) not in legal:
+            problems.append("EXP-ZONE CHECK FAIL: %s 非法状态 %r（合法值 %s）" % (fid, m.group(1), sorted(legal)))
+        for sub in ("artifact:", "quote:", "recalc:"):
+            if sub not in head:
+                problems.append("EXP-ZONE CHECK FAIL: %s 证据三件套缺 %s" % (fid, sub))
+        m = re.search(r"status:\s*(\S+)", head)
+        if m and m.group(1) == "promoted" and "promotion:" not in head:
+            problems.append("EXP-ZONE CHECK FAIL: %s 状态 promoted 但缺 promotion 块" % fid)
+        m = re.search(r"supersedes:\s*(EXP-\d+)", head)
+        if m and not os.path.isfile(os.path.join(zone, m.group(1) + ".md")):
+            problems.append("EXP-ZONE CHECK FAIL: %s supersedes 指向不存在的条目 %s" % (fid, m.group(1)))
+        m = re.search(r"id:\s*(EXP-\d+)", head)
+        if m:
+            ids.add(m.group(1))
+    index_text = open(index_path, encoding="utf-8").read()
+    for fid in ids:
+        if fid not in index_text:
+            problems.append("EXP-ZONE CHECK FAIL: INDEX 未覆盖条目 %s（U-07）" % fid)
+    return problems
+
+
 def check_ledger_invariants(md, skill_version):
     """F-104/F-107 治本（审计建议随 ④a 同批实作；F-124/F-128 修订）：
     a) 台账 F 编号序列严格递增（(num, suffix) 元组序；防插入错位与重复行——F-119）；
@@ -293,7 +346,7 @@ def main():
         print("NO ROWS PARSED — 表格解析失败")
         sys.exit(2)
     # F-159：条款集登记断言——删行/缩表不再静默（新增/删除条款须同步改此数，属刻意的登记动作）
-    EXPECTED_CLAUSES = 89
+    EXPECTED_CLAUSES = 91
     ids = [r["no"] for r in rows]
     if len(rows) != EXPECTED_CLAUSES or ids != list(range(1, EXPECTED_CLAUSES + 1)):
         print("CLAUSE-SET CHECK FAIL: 条款数=%d（期望 %d）或编号非 1..%d 连续——条款行可能被静默增删（F-159）"
@@ -325,12 +378,14 @@ def main():
     inv = check_ledger_invariants(md, skill_version)
     problems.extend(inv)
     problems.extend(check_ledger_file_refs(md, root))  # ④c（F-125）
+    exp_problems = check_experience_zone(root)  # U-07（v2.7.0）：经验区结构校验
+    problems.extend(exp_problems)
     if problems:
         for p in problems:
             print("LEDGER-INVARIANT: " + p)
         print("summary④(台账断言): FAIL（F-83/F-98/F-104/F-107/F-124/F-125 治本项）"
               "——问题 %d 处一次性全部列出" % len(problems))
-        sys.exit(3)
+        sys.exit(3 if not exp_problems else 4)
     print("summary④(台账断言): PASS——④a CHANGELOG 最新条目的 F-NN 均已登记；"
           "④b 台账 F 编号严格递增、CHANGELOG 版本与 frontmatter 一致（不可核验即 FAIL，F-124）；"
           "④c 台账指名文件均存在（F-125）；"

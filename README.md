@@ -1,6 +1,6 @@
 # blender-mcp-skill
 
-[![Version](https://img.shields.io/badge/version-2.6.0-blue)](https://github.com/master666-max/blender-mcp-skill/releases)
+[![Version](https://img.shields.io/badge/version-2.7.0-blue)](https://github.com/master666-max/blender-mcp-skill/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#许可与出处)
 [![Blender](https://img.shields.io/badge/Blender-5.2_LTS-orange)](https://www.blender.org)
 [![Platform](https://img.shields.io/badge/platform-Windows_·_macOS_·_Linux-lightgrey)](#上手三步)
@@ -83,7 +83,7 @@ flowchart LR
 
 **4. 状态一致性**——幂等脚本（重复执行结果一致）；程序化操作后强制退化清理（否则模型悄悄变脏）；快照先行；身份差集对账。
 
-**5. 可验证性工程（看家本领）**——手册中 89 条关键承诺各配一条"指纹"，发布前 89 项全量回归；版本号三处对齐断言；安装位置逐字节比对断言；**对检查器本身做破坏测试**（故意改坏规则/删记录行/塞恒真条件，检查器必须报警——"对验收测试的验收"）。
+**5. 可验证性工程（看家本领）**——手册中 91 条关键承诺各配一条"指纹"，发布前 91 项全量回归；版本号三处对齐断言；安装位置逐字节比对断言；**对检查器本身做破坏测试**（故意改坏规则/删记录行/塞恒真条件，检查器必须报警——"对验收测试的验收"）。
 
 **6. 无头与规模化**——两条离屏路线（Blender 命令行 / bpy wheel 常驻进程）；参数化生成器带固定随机种子与参数钳制，跨机器结果一致。
 
@@ -127,9 +127,9 @@ cp -r blender-mcp-skill ~/.zcode/skills/blender-mcp
 
 ## 凭什么信它
 
-- **独立审计打磨**：deepseek检查方审了 **64 轮**，挑出问题 **166 个**、全部闭环，每个都有记录可回溯；
+- **独立审计打磨**：deepseek检查方审了 **65 轮**，挑出问题 **168 个**、全部闭环，每个都有记录可回溯；
 - **发版自动体检**：89 条规则回归 + 版本对齐 + 五个安装位置逐字节比对 + 记录账一致，缺一不发；
-- **破坏测试守护检查器**：10 条反向探针（支持 `--repeat N` 触发率统计），检查器失灵即自检失败；
+- **破坏测试守护检查器**：11 条反向探针（支持 `--repeat N` 触发率统计），检查器失灵即自检失败；
 - **发行可验真**：SHA256 校验和之外，发行 zip 自 v2.6.0 起附 **ED25519 签名**（公钥在包内 `assets/release-signing/`，验签命令见 INSTALL）——哈希只防损坏，签名才防投毒；
 - **手册句句有出处**：实测 / 查证 / 建议三级标注，不掺水。
 
@@ -161,7 +161,8 @@ cp -r blender-mcp-skill ~/.zcode/skills/blender-mcp
 | `scripts/` | 建模五段式骨架、场景体检、三点布光、渲染回读 |
 | `fragments/` `nodes/` | 代码积木库与节点组库 |
 | `assets/` | 双离线安装包（默认通道 + 回退通道，含校验和、签名公钥、来源说明） |
-| `evals/` | 体检工具：89 条规则回归 runner + 10 条反向探针自检 |
+| `evals/` | 体检工具：91 条规则回归 runner + 11 条反向探针自检（--repeat 统计）+ 基线归档 |
+| `experience/` | **经验区**：任务实战经验的活区账本（EXP 条目，证据三件套；晋升进分册走发版门；预留演化引擎接口） |
 | `docs/` | 设计文档与实战案例 |
 | `showcase/` | 门面展示图 |
 

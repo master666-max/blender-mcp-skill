@@ -59,6 +59,9 @@ PROBES = [
     ('P-N87 发行验签命令破坏', 'INSTALL.md',
      'ssh-keygen -Y verify',
      '验签命令已移除（探针破坏位）', 87, None, 1),
+    ('P-NEXP 经验区状态值破坏', 'experience/EXP-001.md',
+     'status: promoted',
+     'status: archived-bogus', None, 'EXP-ZONE CHECK FAIL', 4),
 ]
 
 
