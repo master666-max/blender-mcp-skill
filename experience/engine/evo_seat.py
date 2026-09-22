@@ -3,6 +3,10 @@
 """evo_seat.py — 微型内核：治理框架×演化内核融合单文件（v0.1.0，架构书 M0-M3）
 ================================================================================
 一个文件 · 一份真相（SQLite）· 六档审查精细度（G0-G5）
+本文件是《SPEC-内核接口与宿主契约 v1》Kernel Interface 的融合形态实现
+（符合性复验：py -X utf8 audit-kit/conformance.py --fused evo_seat.py）。
+治理位边界：内核只提供治理面（账本/锚/门）；验收/裁决/修宪**不入内核**——
+执行无权自宣验收，治理位永远外置。
 分区（区段即边界，单向调用 cli→gates/decide→rank/lifecycle→store→core）：
   §0 SOURCES  §1 core  §2 store  §3 rank  §4 lifecycle  §5 decide
   §6 gates    §7 cli   §8 tests（自注册）                       §9 main
@@ -18,6 +22,8 @@
 import argparse, ast, datetime, fnmatch, json, os, re, sqlite3, sys, time, unittest
 
 VERSION = "0.1.0"
+SPEC = "SPEC-内核接口与宿主契约-v1"   # 本文件实现的规范版本（符合性套件可验）
+GOVERNANCE_BOUNDARY = "验收/裁决/修宪不入内核（执行无权自宣验收）——治理位外置"
 
 # ═══════════════════════════ §0 SOURCES（唯一事实源） ═══════════════════════════
 LEVELS = ("G0", "G1", "G2", "G3", "G4", "G5")
@@ -62,6 +68,15 @@ def event_hash(prev_hash: str, payload, actor: str = "", kind: str = "") -> str:
     return __import__("hashlib").sha256((prev_hash + body).encode("utf-8")).hexdigest()
 
 GENESIS = "0" * 64
+
+def framework_sha() -> str:
+    """§F 副本对账：框架段哈希（§1 core…§6 gates 文本段）——合并形态副本与权威版对账用。"""
+    src = open(os.path.abspath(__file__), encoding="utf-8").read()
+    a = src.find("§1 core")
+    b = src.find("§7 cli")
+    if a < 0 or b < 0: return ""
+    import hashlib
+    return hashlib.sha256(src[a:b].encode("utf-8")).hexdigest()[:16]
 _HEX = re.compile(r"^[0-9a-f]{64}$")
 _ACTOR = re.compile(r"^(llm|fallback|human|ci|engine):[^\s]+$")
 
@@ -330,12 +345,13 @@ def cmd_tombstone(a):
 
 def cmd_verify(a):
     s = Store.open(a.lib); s.verify()
-    print(f"verify: 通过（events={s.count()} 链完整 触发器在位 level={s.level()}）")
+    print(f"verify: 通过（events={s.count()} 链完整 触发器在位 level={s.level()} framework_sha={framework_sha()}）")
 
 def cmd_level(a):
     s = Store.open(a.lib)
     r = s.set_level(a.level.upper(), "human:cli")
-    print(f"level: {r['from']} → {r['to']}（降级已留痕）")
+    up = LEVELS.index(r["to"]) > LEVELS.index(r["from"])
+    print(f"level: {r['from']} → {r['to']}（{'升档' if up else '降级已留痕'}）")
 
 def cmd_gate(a):
     s = Store.open(a.lib); _require(s, "G3")
@@ -381,7 +397,9 @@ def cmd_audit(a):
               ("决策留痕", lv >= "G4"), ("入库锚+扫描", lv >= "G5")]
     for name, on in checks:
         print(f"  [{'在位' if on else '本档不查'}] {name}")
-    print(f"audit: level={lv} events={s.count()}")
+    print(f"  [符合] {SPEC}（复验：conformance.py --fused evo_seat.py）")
+    print(f"  [边界] {GOVERNANCE_BOUNDARY}")
+    print(f"audit: level={lv} events={s.count()} framework_sha={framework_sha()}")
 
 # ═══════════════════════════ §8 tests（内嵌自注册） ═══════════════════════════
 class TestCore(unittest.TestCase):

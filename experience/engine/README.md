@@ -1,9 +1,16 @@
 # 演化引擎（evo-seat 微型内核）— 经验区的对接层
 
 > **来源**：审计区设计并实现（`D:/zcode-workspace-audit/`），
-> `evo_seat.py` v0.1.0，vendored **逐字节未改**。
-> sha256 = `61a808be5a9a2411d720fce9cc4a582cb037cac18af718158073d08a0110c3e6`
-> （升级时替换此文件并更新本行哈希；配套映射见下，桥接脚本 `exp_bridge.py`）。
+> `evo_seat.py` v0.1.0（**SPEC 对齐版**），vendored **逐字节未改**。
+> sha256 = `43f8db8fa5086a2859b0085f99d6131d1c4c01466886666e3cf989dca2eb64da`
+> （升级时替换此文件并更新本行哈希 + 指纹 #92；配套映射见下，桥接脚本 `exp_bridge.py`）。
+> 上一版 = `61a808be…`（v2.8.0 首发；v2.8.1 换装，见 CHANGELOG）。
+>
+> **v2.8.1 新增（SPEC 对齐）**：`SPEC = SPEC-内核接口与宿主契约-v1` 符合性声明 +
+> **治理位边界**（验收/裁决/修宪**不入内核**——执行无权自宣验收，治理位永远外置）
+> + **`framework_sha()` 副本对账**（§1core…§6gates 文本段哈希，`verify`/`audit`
+> 顺带输出，合并形态副本与权威版对账用——T-E 防御）；`audit` 增 [符合]/[边界] 行。
+> 本包 vendored 副本当前 `framework_sha = 89adf037485b4148`（以实跑输出为准）。
 
 ## 它是什么
 
