@@ -18,16 +18,20 @@
   py -X utf8 evo_seat.py retrieve <库> "查询词" [-k 5]
   py -X utf8 evo_seat.py level <库> G3          # 切档（降级留痕）
   py -X utf8 evo_seat.py verify <库> | selftest | gate <file.py> | decide <库> conflict <f1> <f2> | anchor <库> | scan <目录>
+  py -X utf8 evo_seat.py override <库> --actor human:you --decision "keep:e2" --rationale "理由" [--target-seq N]
+                                      # 人侧仲裁（S8-4）：只接受 human:*；写 human_override 终局标记，不删历史
 """
 import argparse, ast, datetime, fnmatch, json, os, re, sqlite3, sys, time, unittest
 
-VERSION = "0.2.1"
+VERSION = "0.2.2"
 # 变更记录（版本纪律：破坏性变更必升版本+声明算法版本）：
 #   0.1.0  初版（哈希 v1：只覆盖 payload）
 #   0.2.0  哈希 v2（actor/kind 并入——老库不可读，需重建）+SPEC v1 吸收+
 #          framework_sha 对账+升档文案修正
 #   0.2.1  framework_sha 判别力修复（横幅定位+长度断言——原实现只哈希 66 字节，
 #          blender 线实测 CONFIRMED 判别力近零）+哈希键兼容试算
+#   0.2.2  §7 投影语义对齐（S5/T1：与重装形态 evocore.project 同语义——建条盖账本 ts /
+#          命中回放 last_used / 墓碑生效）；**机制段 §1-§6 未动 ⇒ framework_sha 不变**
 HASH_ALGO = "v2"
 SPEC = "SPEC-内核接口与宿主契约-v1"   # 本文件实现的规范版本（符合性套件可验）
 GOVERNANCE_BOUNDARY = "验收/裁决/修宪不入内核（执行无权自宣验收）——治理位外置"
@@ -128,7 +132,8 @@ class Store:
     @classmethod
     def open(cls, path: str) -> "Store":
         pre = os.path.isfile(path)
-        conn = sqlite3.connect(path, isolation_level=None)
+        conn = sqlite3.connect(path, isolation_level=None, timeout=5.0)
+        conn.execute("PRAGMA busy_timeout = 5000")  # 并发写者排队而非立即 SQLITE_BUSY
         if pre:
             cls._require_triggers(conn)      # 既有库先验（防 IF NOT EXISTS 静默重建掩盖）
             cls._require_hash_algo(conn)     # 老算法库先拒（防 SCHEMA 补键掩盖——同族教训）
@@ -189,13 +194,21 @@ class Store:
             prev = self_h
 
     def append(self, actor: str, kind: str, payload: dict) -> dict:
-        row = self.c.execute("SELECT self_hash FROM events ORDER BY seq DESC LIMIT 1").fetchone()
-        prev = row[0] if row else GENESIS
-        self_h = event_hash(prev, payload, actor, kind)
-        ts = time.strftime("%Y-%m-%dT%H:%M:%S")
-        cur = self.c.execute(
-            "INSERT INTO events (ts,actor,kind,payload,prev_hash,self_hash) VALUES (?,?,?,?,?,?)",
-            (ts, actor, kind, canonical_json(payload), prev, self_h))
+        # 取尾→INSERT 同一事务（BEGIN IMMEDIATE 串行化并发写者）：
+        # 分离执行时两写者同读尾哈希→链分叉，触发器禁修，库只余重建。
+        self.c.execute("BEGIN IMMEDIATE")
+        try:
+            row = self.c.execute("SELECT self_hash FROM events ORDER BY seq DESC LIMIT 1").fetchone()
+            prev = row[0] if row else GENESIS
+            self_h = event_hash(prev, payload, actor, kind)
+            ts = time.strftime("%Y-%m-%dT%H:%M:%S")
+            cur = self.c.execute(
+                "INSERT INTO events (ts,actor,kind,payload,prev_hash,self_hash) VALUES (?,?,?,?,?,?)",
+                (ts, actor, kind, canonical_json(payload), prev, self_h))
+            self.c.execute("COMMIT")
+        except Exception:
+            self.c.execute("ROLLBACK")
+            raise
         return {"seq": cur.lastrowid, "ts": ts, "actor": actor, "kind": kind,
                 "payload": payload, "prev_hash": prev, "self_hash": self_h}
 
@@ -329,16 +342,48 @@ def _require(store, lv: str):
     if store.level_index() < LEVELS.index(lv):
         raise EvoError(f"需 {lv} 档（当前 {store.level()}）：evo level {lv} 升档")
 
+def _content_hash(e: dict) -> str:
+    """条目内容指纹（幂等键，16 hex）。
+
+    **口径分歧已登记（W2-N4 · 20260923）**：本实现只排除 `id/entry_id/content_hash`，
+    而重装形态的唯一来源 `evocore/entry.py:content_hash` 还排除 `state/last_used_at`
+    并把 keywords 归一为有序词表；宿主侧桥 `bridge.record_append` 又是第三种
+    （全量 entry 的 64 hex，无排除无归一）。⇒ **同一逻辑条目在三形态下指纹不同**，
+    跨形态迁移时幂等去重会失效（SPEC §G「两个入口，一道门」在跨形态面上未成立）。
+    原注释称「与 bridge.content_hash 同口径」为**假**（bridge 无该函数，且宽度不同），已更正。
+    统一属破坏性变更（既有库指纹全部失效）——须走版本闸流程（同 hash v1→v2 的处置），
+    登记为 `evocore-D7`，钉桩测试见 `build/tests/test_content_hash_divergence.py`。
+    （措辞注：本件受自包含扫描约束——源码不得出现宿主包名，故此处只写「宿主侧桥」。）
+    """
+    import hashlib
+    body = canonical_json({k: v for k, v in e.items() if k not in ("id", "entry_id", "content_hash")})
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]
+
 def _load_entries(store) -> list:
-    """条目从 events 流复原（memory_append+promotion 状态投影）。"""
+    """条目从 events 流复原（S5/T1 语义对齐：与重装形态 `evocore.project.project_entries`
+    同语义——形态分离、语义对齐；差异由跨形态对照段常设盯防）：
+      memory_append → 建条（created_at=payload 显式值，否则**账本行 ts**）
+      promotion     → state=longterm
+      memory_retrieve_hit → **last_used_at=账本行 ts**（命中持久；原为内存态）
+      tombstone     → **tombstone=True**（退出检索、原位保留；原投影未处理）"""
     import json
     proj = {}
-    for _seq, _ts, _actor, kind, payload, _ph, _sh in store.rows():
+    for _seq, ts, _actor, kind, payload, _ph, _sh in store.rows():
         p = json.loads(payload)
+        eid = p.get("entry_id")
         if kind == "memory_append":
-            proj[p["entry_id"]] = p | {"id": p["entry_id"]}
-        elif kind == "promotion":
-            if p.get("entry_id") in proj: proj[p["entry_id"]]["state"] = "longterm"
+            e = p | {"id": eid}
+            if not e.get("created_at"):
+                e["created_at"] = ts
+            proj[eid] = e
+        elif kind == "promotion" and eid in proj:
+            proj[eid]["state"] = "longterm"
+        elif kind == "memory_retrieve_hit" and eid in proj:
+            proj[eid]["last_used_at"] = ts
+        elif kind == "tombstone" and eid in proj:
+            proj[eid]["tombstone"] = True
+        elif kind == "attic_nomination" and eid in proj:
+            proj[eid]["state"] = "attic"   # 与 evocore.lifecycle.attic 同语义（桥写事件此前被投影丢弃）
     return list(proj.values())
 
 def cmd_init(a):
@@ -353,11 +398,46 @@ def cmd_append(a):
     s = Store.open(a.lib)
     if s.level_index() >= 2: validate_entry({"id": a.id, "content": a.content,
         "type": a.type, "importance": a.importance})   # G2 起强制构造校验
+    existing = {e.get("id"): e for e in _load_entries(s)}
+    if a.id in existing:
+        # id 幂等闸（02-bugs R5 状态机破口）：同 id 异内容重追加=覆盖投影（tombstone/
+        # attic/promotion 历史被抹，墓碑条目复活回检索）→ 拒绝；同 id 同内容=幂等
+        # no-op（与 cmd_import 的 content_hash 去重同语义，静态演示块可安全重跑）。
+        old = existing[a.id]
+        if (old.get("content") != a.content or old.get("type") != a.type
+                or old.get("importance") != a.importance):
+            raise EvoError(f"append 拒绝：id={a.id!r} 已在库且内容不同（重追加=覆盖历史，改内容请用新 id）")
+        print(f"append: {a.id} 幂等跳过（同 id 同内容已在库）")
+        return
     e = {"id": a.id, "content": a.content, "keywords": (a.keywords or "").split(),
          "importance": a.importance, "type": a.type, "state": route(
              {"importance": a.importance}), "created_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
     r = s.append("llm:cli", "memory_append", e | {"entry_id": a.id})
     print(f"append: {a.id} seq={r['seq']} state={e['state']}")
+
+def cmd_import(a):
+    """批量注入：JSONL 逐行 → 构造校验（G2+）→ content_hash 幂等去重 → append。
+    注入面只此一道门——批量不等于放宽（坏行拒、重复跳、全走 append 留痕）。"""
+    s = Store.open(a.lib)
+    seen = {e.get("content_hash") for e in _load_entries(s) if e.get("content_hash")}
+    n_in = n_dup = n_bad = 0
+    for line in open(a.file, encoding="utf-8"):
+        line = line.strip()
+        if not line: continue
+        try:
+            e = json.loads(line)
+        except Exception:
+            n_bad += 1; continue
+        if not isinstance(e, dict) or not str(e.get("id", "")).strip():
+            n_bad += 1; continue
+        if s.level_index() >= 2: validate_entry(e)
+        chash = _content_hash(e)
+        if chash in seen:
+            n_dup += 1; continue
+        seen.add(chash)
+        s.append("import:pipeline", "memory_append", e | {"entry_id": e["id"], "content_hash": chash})
+        n_in += 1
+    print(f"import: 注入 {n_in} / 去重 {n_dup} / 坏行 {n_bad}（来源 {a.file}）")
 
 def cmd_retrieve(a):
     s = Store.open(a.lib)
@@ -371,7 +451,14 @@ def _now_or(at): return datetime.datetime.fromisoformat(at) if at else None
 
 def cmd_promote(a):
     s = Store.open(a.lib); _require(s, "G0")
-    e = {"id": a.id, "importance": 99}
+    cur = next((e for e in _load_entries(s) if e.get("id") == a.id), None)
+    if cur is None:
+        raise EvoError(f"promote 拒绝：id={a.id!r} 不在库（悬空晋升会伪造留痕）")
+    if cur.get("tombstone"):
+        raise EvoError(f"promote 拒绝：id={a.id!r} 已 tombstone（退出检索原位保留，不得晋升）")
+    if cur.get("state") == "attic":
+        # 与 evocore.lifecycle.promote 同守卫：attic 条目不得直接晋升（须先人工恢复）
+        raise EvoError(f"promote 拒绝：id={a.id!r} 在 attic（须先人工恢复再晋升）")
     s.append("engine", "promotion", {"entry_id": a.id})
     print(f"promote: {a.id} → longterm（留痕已入账）")
 
@@ -402,9 +489,83 @@ def cmd_decide(a):
     s = Store.open(a.lib); _require(s, "G4")
     entries = _load_entries(s)
     picked = [e for e in entries if e["id"] in set(a.ids)]
-    tr, *_ = adjudicate(a.intent, picked if picked else entries[:2])
-    s.append("engine", "memory_adjudicate", tr)
+    use = picked if picked else entries[:2]
+    for eid, marks in _override_marks(s).items():
+        if eid in {e["id"] for e in use}:
+            for ov_seq, tgt, dec, why in marks:
+                print(f"  [已由人工终裁] {eid} ← 终裁 seq={ov_seq}（针对判定 seq={tgt}）"
+                      f"decision={dec}（{why}）")
+    tr, *_ = adjudicate(a.intent, use)
+    r = s.append("engine", "memory_adjudicate", tr)
     print(json.dumps(tr, ensure_ascii=False, indent=1))
+    print(f"decide: 留痕 seq={r['seq']}（可被 `override --target-seq {r['seq']}` 人工终裁）")
+
+
+# ---- 人侧仲裁通道（S8-4 · 20260923 开工批）----
+def _overrides(store) -> list:
+    """人工终裁事件表 [(自身 seq, payload)]（读侧）。
+
+    与重装形态 `evocore.project.project_overrides` **同语义**（形态分离、语义对齐；
+    跨形态对拍见 `build/tests/test_governance_matrix.py`）。
+    """
+    out = []
+    for seq, _ts, _actor, kind, payload, _ph, _sh in store.rows():
+        if kind == "human_override":
+            out.append((seq, json.loads(payload)))
+    return out
+
+
+def _override_marks(store) -> dict:
+    """把终裁回溯到条目：payload.target_seq → 该 seq 的 memory_adjudicate 留痕里的 entries[]。
+    返回 {entry_id: [(终裁自身 seq, 被终裁的判定 seq, decision, rationale)]}；
+    无 target_seq 的方针性终裁不入此表（只在 audit 计数）。"""
+    adj = {}
+    for seq, _ts, _actor, kind, payload, _ph, _sh in store.rows():
+        if kind == "memory_adjudicate":
+            adj[seq] = json.loads(payload).get("entries", [])
+    marks = {}
+    for ov_seq, p in _overrides(store):
+        tgt = p.get("target_seq")
+        if tgt is None:
+            continue
+        try:
+            tseq = int(tgt)
+        except (TypeError, ValueError):
+            continue   # 畸形 target_seq：跳过而非中断整表
+        for eid in adj.get(tseq, []):
+            marks.setdefault(eid, []).append((ov_seq, tseq, p.get("decision"), p.get("rationale")))
+    return marks
+
+
+def cmd_override(a):
+    """人侧仲裁（S8-4）：写 `human_override` 事件=**终局标记**。
+
+    铁律落地：治理位在库外 ⇒ 本通道**只接受 `human:*` 身份**（fail-closed 断言，Agent 不得冒用）；
+    且只在 CLI/ops 面存在，**不进协议面八工具**（协议面是 Agent 的入口，人侧动作不该从那走）。
+    payload 冻结（S8工单 S8-4）：`{target_seq?, decision, rationale, cap_ref?}`。
+    终裁不删历史：被终裁的判定事件仍在账（append-only），只是查询侧标注「已由人工终裁」。
+    """
+    s = Store.open(a.lib)
+    if not a.actor.startswith("human:"):
+        raise EvoError(f"override 仅限人侧身份 human:*（得 {a.actor!r}）——治理位在库外，Agent 不得冒用")
+    if a.target_seq is not None:
+        try:
+            a.target_seq = int(a.target_seq)
+        except (TypeError, ValueError):
+            raise EvoError(f"target_seq 须整数（得 {a.target_seq!r}）")
+        row = s.c.execute("SELECT seq,kind FROM events WHERE seq=?", (a.target_seq,)).fetchone()
+        if not row:
+            raise EvoError(f"target_seq={a.target_seq} 不在账（拒绝悬空终裁：终裁必须指向真实事件）")
+        if row[1] != "memory_adjudicate":
+            raise EvoError(f"target_seq={a.target_seq} 是 {row[1]} 事件（终裁只指向 memory_adjudicate 判定留痕）")
+    payload = {"decision": a.decision, "rationale": a.rationale}
+    if a.target_seq is not None:
+        payload["target_seq"] = a.target_seq
+    if a.cap_ref:
+        payload["cap_ref"] = a.cap_ref
+    r = s.append(a.actor, "human_override", payload)
+    print(f"override: 终裁已入账 seq={r['seq']} actor={a.actor} decision={a.decision}"
+          + (f" target_seq={a.target_seq}" if a.target_seq is not None else ""))
 
 def cmd_anchor(a):
     s = Store.open(a.lib); _require(s, "G5")
@@ -426,17 +587,74 @@ def cmd_selftest(a):
                                                 pattern="evo_seat.py")
     unittest.TextTestRunner(verbosity=0).run(suite)
 
+_PCT_BASE = 100.0          # 百分比基数（来源视图占比用；三形态同名同值）
+
+
+def _source_stats(store) -> dict:
+    """来源视图（S8-6 最小版）：按**完整 actor** 聚合——只回答"谁的 Agent 在喂什么"。
+
+    与重装形态 `evocore.project.project_sources` 同语义（跨形态一致性由
+    `build/tests/test_sources_view.py` 钉，不靠注释声称）。只计数不判可信度——
+    被采纳率/污染率属完整版，归 L2-2。
+    键用完整 actor 而非首段前缀：`llm:alpha:g1` 与 `llm:beta:g2` 必须分桶，
+    否则本视图为它们要区分的东西而失效（`project_sources` 有登记说明）。
+    """
+    out = {}
+    for _seq, ts, actor, kind, _payload, _ph, _sh in store.rows():
+        key = actor or "(空 actor)"          # 完整 actor 为键（截首段会把两个 Agent 并成一桶）
+        s = out.setdefault(key, {"events": 0, "by_kind": {}, "last_ts": ""})
+        s["events"] += 1
+        s["by_kind"][kind] = s["by_kind"].get(kind, 0) + 1
+        if ts > s["last_ts"]:
+            s["last_ts"] = ts
+    return out
+
+
 def cmd_audit(a):
-    s = Store.open(a.lib); s.verify()
+    # W2-N1（20260923 开工批）：原 checks 首项写死字面量 True——恒真锚（本项目自己的禁忌：
+    # 「什么都没查」与「查了没问题」输出同形）。改为实测三值：触发器在位数 + 链复放结果 +
+    # 失败原因；账本不可信时 fail-closed 退出（不许"报完就过"）。档位不足的格子仍报「本档不查」
+    # （=None，与 False「不在位」严格分开，三态不与通过同形）。
+    chain_err = None
+    try:
+        s = Store.open(a.lib)      # 开库即验（触发器/老算法库先拒）
+        s.verify()                 # 显式复验：把「验过」变成被测得的值
+    except EvoError as e:
+        chain_err = str(e); s = None
+    if s is None:
+        print(f"  [不在位] 账本链与触发器（{chain_err}）")
+        print("audit: FAIL —— 账本不可信，其余检查无意义（fail-closed）")
+        raise SystemExit(1)
+    n_trig = len({"no_update", "no_delete"} & {
+        r[0] for r in s.c.execute("SELECT name FROM sqlite_master WHERE type='trigger'")})
+    n_ev = s.count()
     lv = s.level()
-    checks = [("账本链与触发器", True), ("墓碑审计窗口", lv >= "G1"),
-              ("条目构造校验", lv >= "G2"), ("质量门", lv >= "G3"),
-              ("决策留痕", lv >= "G4"), ("入库锚+扫描", lv >= "G5")]
+    checks = [("账本链与触发器", chain_err is None and n_trig == 2),
+              ("墓碑审计窗口", True if lv >= "G1" else None),
+              ("条目构造校验", True if lv >= "G2" else None),
+              ("质量门", True if lv >= "G3" else None),
+              ("决策留痕", True if lv >= "G4" else None),
+              ("入库锚+扫描", True if lv >= "G5" else None)]
     for name, on in checks:
-        print(f"  [{'在位' if on else '本档不查'}] {name}")
+        print(f"  [{'在位' if on else '不在位' if on is False else '本档不查'}] {name}")
+    print(f"  [实测] append-only 触发器 {n_trig}/2 · 链重放 {n_ev} 事件"
+          f"{'全部复算通过' if chain_err is None else '失败'}")
+    ovs = _overrides(s)
+    print(f"  [实测] 人侧终裁通道：human_override 事件 {len(ovs)} 条"
+          f"（自身 seq：{[q for q, _ in ovs]}）· 回溯到条目 {len(_override_marks(s))} 个"
+          f"（通道在 CLI `override`，不进协议面）")
+    stats = _source_stats(s)
+    tot = sum(v["events"] for v in stats.values())
+    print(f"  [实测] 来源视图（最小版 · 按 actor · 共 {tot} 事件）：")
+    for pfx in sorted(stats):
+        v = stats[pfx]
+        share = f"{_PCT_BASE * v['events'] / tot:.1f}%" if tot else "—"
+        print(f"      {pfx:16s} {v['events']:4d} 条 · {share:>6s} · 最近 {v['last_ts']}"
+              f" · kind {len(v['by_kind'])} 种")
+    print("      （完整版=被采纳率/污染率，归 L2-2；本视图只到「谁在喂」可见）")
     print(f"  [符合] {SPEC}（复验：conformance.py --fused evo_seat.py）")
     print(f"  [边界] {GOVERNANCE_BOUNDARY}")
-    print(f"audit: level={lv} events={s.count()} framework_sha={framework_sha()}")
+    print(f"audit: level={lv} events={n_ev} framework_sha={framework_sha()}")
 
 # ═══════════════════════════ §8 tests（内嵌自注册） ═══════════════════════════
 class TestCore(unittest.TestCase):
@@ -496,7 +714,7 @@ class TestSelf(unittest.TestCase):
         self.assertNotEqual(h1, h2, "破坏框架段必须改变哈希（判别力）")
     def test_version_and_algo_declared(self):
         # 版本纪律：破坏性变更必升版本+算法版本声明
-        self.assertEqual(VERSION, "0.2.1")
+        self.assertEqual(VERSION, "0.2.2")
         self.assertEqual(HASH_ALGO, "v2")
     def test_self_source_scan_has_no_host_words(self):
         # 自包含不变量：源码不含宿主名（断言用拼接避开自指）
@@ -512,6 +730,7 @@ def main():
     for f, req in (("id", True), ("content", True), ("keywords", False)):
         p.add_argument(f"--{f}", required=req)
     p.add_argument("--type", default="semantic"); p.add_argument("--importance", type=int, default=5)
+    p = sp.add_parser("import"); p.add_argument("lib"); p.add_argument("file")
     p = sp.add_parser("retrieve"); p.add_argument("lib"); p.add_argument("query")
     p.add_argument("-k", type=int, default=5); p.add_argument("--at", default=None)
     p = sp.add_parser("promote"); p.add_argument("lib"); p.add_argument("id")
@@ -523,12 +742,18 @@ def main():
         choices=["conflict", "merge", "promote"]); p.add_argument("ids", nargs="+")
     p = sp.add_parser("anchor"); p.add_argument("lib")
     p = sp.add_parser("scan"); p.add_argument("lib"); p.add_argument("dir")
+    p = sp.add_parser("override"); p.add_argument("lib")          # 人侧仲裁（S8-4）
+    p.add_argument("--actor", required=True, help="人侧身份，必须 human:*（Agent 不得冒用）")
+    p.add_argument("--decision", required=True); p.add_argument("--rationale", required=True)
+    p.add_argument("--target-seq", type=int, default=None, dest="target_seq",
+                   help="被终裁事件的 seq（须在账；缺省=不指向具体事件的方针性终裁）")
+    p.add_argument("--cap-ref", default=None, dest="cap_ref")
     sp.add_parser("selftest")
     p = sp.add_parser("audit"); p.add_argument("lib")
     a = ap.parse_args()
-    fn = {"init": cmd_init, "append": cmd_append, "retrieve": cmd_retrieve,
+    fn = {"init": cmd_init, "append": cmd_append, "import": cmd_import, "retrieve": cmd_retrieve,
           "promote": cmd_promote, "tombstone": cmd_tombstone, "verify": cmd_verify,
-          "level": cmd_level, "gate": cmd_gate, "decide": cmd_decide,
+          "level": cmd_level, "gate": cmd_gate, "decide": cmd_decide, "override": cmd_override,
           "anchor": cmd_anchor, "scan": cmd_scan, "selftest": cmd_selftest,
           "audit": cmd_audit}[a.cmd]
     fn(a)

@@ -1,4 +1,4 @@
-# INSTALL — blender-mcp skill 安装说明（v2.9.1）
+# INSTALL — blender-mcp skill 安装说明（v2.9.2）
 
 > 面向 AI 编码代理（ZCode / Claude Code / Cursor / Codex 等）的 Blender 实时操控技能包。
 > 让代理通过 blender-mcp 直连真实运行的 Blender：建模、材质、几何节点、灯光相机、渲染出图、

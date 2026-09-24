@@ -1,6 +1,6 @@
 # blender-mcp-skill
 
-[![Version](https://img.shields.io/badge/version-2.9.1-blue)](https://github.com/master666-max/blender-mcp-skill/releases)
+[![Version](https://img.shields.io/badge/version-2.9.2-blue)](https://github.com/master666-max/blender-mcp-skill/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#许可与出处)
 [![Blender](https://img.shields.io/badge/Blender-5.2_LTS-orange)](https://www.blender.org)
 [![Platform](https://img.shields.io/badge/platform-Windows_·_macOS_·_Linux-lightgrey)](#上手三步)

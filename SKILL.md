@@ -15,7 +15,7 @@ description: >
   references/10-headless-ci.md。
 metadata:
   author: misdeep
-  version: "2.9.1"
+  version: "2.9.2"
   verified_on: "Blender 5.2.1 LTS + brickfly-mcp 2.0.0 (skill fork, 31 tools) + addon v1.7 (protocol 7), Windows, 中文UI"
 ---
 

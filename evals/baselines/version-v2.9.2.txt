@@ -1,0 +1,1 @@
+VERSION-CHECK PASS: frontmatter=2.9.2, INSTALL title=2.9.2, expected=2.9.2
