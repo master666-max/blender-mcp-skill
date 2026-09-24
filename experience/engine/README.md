@@ -102,7 +102,9 @@ py -X utf8 exp_bridge.py import ../state/evo.db           # 把 EXP 条目灌入
 
 引擎的 import 白名单（G3 门）服务于**引擎自身的单文件自包含契约**；`exp_bridge.py`
 是**宿主侧适配器**，按设计依赖 `evo_seat`——因此对桥跑 `gate` 会报
-`evo_seat 不在白名单`，这是契约的正常边界，不是缺陷。引擎自身的自食门以
+`evo_seat 不在白名单`，这是契约的正常边界，不是缺陷。**同款边界适用于
+`scripts/exp_hint.py`**（宿主件；其 `--engine` 通路按设计使用 `subprocess`——白名单外，
+门拒属正常，F-169）。引擎自身的自食门以
 `gate evo_seat.py` 为准（已通过）；桥的正确性由功能冒烟（import→verify→retrieve）保证。
 
 ## 不变量（嵌入不放宽）

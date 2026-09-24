@@ -1,6 +1,6 @@
 # blender-mcp-skill
 
-[![Version](https://img.shields.io/badge/version-2.9.2-blue)](https://github.com/master666-max/blender-mcp-skill/releases)
+[![Version](https://img.shields.io/badge/version-2.9.3-blue)](https://github.com/master666-max/blender-mcp-skill/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#许可与出处)
 [![Blender](https://img.shields.io/badge/Blender-5.2_LTS-orange)](https://www.blender.org)
 [![Platform](https://img.shields.io/badge/platform-Windows_·_macOS_·_Linux-lightgrey)](#上手三步)
@@ -94,7 +94,7 @@ flowchart LR
 用的时候一条命令就够：`py -X utf8 scripts/exp_hint.py 关键词 …` 会把相关的教训（连"规避法"和复算命令）直接列出来；没命中就照实说没命中，不硬凑。skill 自身也把"开工前先扫一遍经验区"写成了每次任务的固定第一步。
 
 ```bash
-# 经验区速查（装了就能用，零依赖）
+# 经验区速查（在 skill 包根执行；装了就能用，零依赖）
 py -X utf8 scripts/exp_hint.py                  # 列出全部教训条目
 py -X utf8 scripts/exp_hint.py 烘焙 方向          # 按任务关键词查相关教训（命中的先读"规避法"再动手）
 

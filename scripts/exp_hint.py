@@ -14,7 +14,9 @@
     口径如实：本区条目全部为 procedural（零衰减），故引擎的「类型衰减排序」在本区
     **无区分度**（各条衰减乘数同为 0）——engine 通路在本区的真实增益 = 命中留痕 + 分词打分。
 命中=关键词出现次数加权（id/一句话/claims 权 3，规避法/现象正文权 2，其余权 1）；
-同分按编号序。**无命中照实说「无命中」、不虚构相关条目**（宁缺勿编）。
+同分按编号序。**命中数=全量口径**（先数全部命中、再按 --top 显示前 k 条，超量时注明
+——F-167）；--top 须 ≥1（非正数显式报错，F-167）。**无命中照实说「无命中」、不虚构
+相关条目**（宁缺勿编）。
 """
 import argparse
 import glob
@@ -80,10 +82,13 @@ def clip(s, n=72):
 def main():
     ap = argparse.ArgumentParser(description="经验区检索：给任务关键词，出命中清单")
     ap.add_argument("keywords", nargs="*", help="任务关键词（可多个；留空=列全部）")
-    ap.add_argument("--top", type=int, default=5, help="命中清单条数上限（默认 5）")
+    ap.add_argument("--top", type=int, default=5, help="命中清单条数上限（默认 5；须 ≥1）")
     ap.add_argument("--engine", action="store_true",
                     help="走引擎检索（多命中留痕+last_used；账本未初始化则回退文件扫）")
     a = ap.parse_args()
+    if a.top < 1:
+        print("ERROR: --top 须 ≥1（收到 %d）——拒绝静默钳制（F-167）" % a.top)
+        sys.exit(2)
     if not os.path.isdir(EXP_DIR):
         print("ERROR: 未找到经验区目录 experience/（包结构异常）")
         sys.exit(2)
@@ -94,6 +99,8 @@ def main():
     entries = [parse_entry(p) for p in files]
     total = len(entries)
     if not a.keywords:
+        if a.engine:
+            print("（--engine 需配合关键词；本次按全部条目列出）")
         print("经验区全部条目（共 %d 条；详情与晋升去向见 experience/INDEX.md）：" % total)
         for e in entries:
             pad = " " * max(0, 10 - len(e["status"]))
@@ -114,15 +121,20 @@ def main():
         print("（检测到引擎账本：加 --engine 可用命中留痕/last_used；账本=运行态，不入包）")
     ranked = sorted(((score(e, a.keywords), e) for e in entries),
                     key=lambda t: (-t[0], t[1]["id"]))
-    hits = [(s, e) for s, e in ranked if s > 0][: a.top]
-    if not hits:
+    all_hits = [(s, e) for s, e in ranked if s > 0]
+    shown = all_hits[: a.top]
+    if not all_hits:
         print("命中 0/%d 条（关键词：%s）——无命中照实说，不虚构相关条目。"
               % (total, " ".join(a.keywords)))
         print("建议：换任务名/工具名/现象词重试，或通览 experience/INDEX.md。")
         return
-    print("命中 %d/%d 条（关键词：%s；先读规避法再动手）："
-          % (len(hits), total, " ".join(a.keywords)))
-    for s, e in hits:
+    if len(all_hits) > len(shown):
+        print("命中 %d/%d 条（关键词：%s；显示前 %d 条，可用 --top 调整；先读规避法再动手）："
+              % (len(all_hits), total, " ".join(a.keywords), len(shown)))
+    else:
+        print("命中 %d/%d 条（关键词：%s；先读规避法再动手）："
+              % (len(all_hits), total, " ".join(a.keywords)))
+    for s, e in shown:
         print()
         print("%s [%s] %s   （相关度 %d）" % (e["id"], e["status"], clip(e["one"], 68), s))
         if e["mid"]:
@@ -130,7 +142,7 @@ def main():
         if e["recalc"]:
             print("  复算：%s" % clip(e["recalc"][0], 88))
     print()
-    print("全文（含证据三件套）在 experience/%s.md；全量索引 experience/INDEX.md" % hits[0][1]["id"])
+    print("全文（含证据三件套）在 experience/%s.md；全量索引 experience/INDEX.md" % shown[0][1]["id"])
 
 
 main()

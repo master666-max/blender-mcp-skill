@@ -313,7 +313,7 @@ def check_ledger_invariants(md, skill_version):
     problems = []
     ledger = open(md, encoding="utf-8").read()
     # F-161：台账集登记断言——增删台账行须同步修改此数（刻意的登记动作）
-    EXPECTED_LEDGER_ROWS = 138
+    EXPECTED_LEDGER_ROWS = 141
     loose = len(re.findall(r"^\| F-\S+ \|", ledger, re.M))
     if loose != EXPECTED_LEDGER_ROWS:
         problems.append("LEDGER-SET CHECK FAIL: 台账 F 行=%d（期望 %d）——台账行可能被静默增删（F-161；ASCII 标签供探针判定，F-166）"
