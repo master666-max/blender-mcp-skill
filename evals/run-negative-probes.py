@@ -65,6 +65,9 @@ PROBES = [
     ('P-N93 删经验区开工前步（SKILL §0）', 'SKILL.md',
      '5. **开工前扫经验区（U-09，每次任务必做）**：',
      None, 93, None, 1),
+    ('P-N96 删签名核验闸锚（⑤查）', 'evals/check-sign.py',
+     'check-sign.py — ⑤查 发行签名核验',
+     None, 96, None, 1),
 ]
 
 

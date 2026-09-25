@@ -313,7 +313,7 @@ def check_ledger_invariants(md, skill_version):
     problems = []
     ledger = open(md, encoding="utf-8").read()
     # F-161：台账集登记断言——增删台账行须同步修改此数（刻意的登记动作）
-    EXPECTED_LEDGER_ROWS = 141
+    EXPECTED_LEDGER_ROWS = 146
     loose = len(re.findall(r"^\| F-\S+ \|", ledger, re.M))
     if loose != EXPECTED_LEDGER_ROWS:
         problems.append("LEDGER-SET CHECK FAIL: 台账 F 行=%d（期望 %d）——台账行可能被静默增删（F-161；ASCII 标签供探针判定，F-166）"
@@ -349,7 +349,7 @@ def main():
         print("NO ROWS PARSED — 表格解析失败")
         sys.exit(2)
     # F-159：条款集登记断言——删行/缩表不再静默（新增/删除条款须同步改此数，属刻意的登记动作）
-    EXPECTED_CLAUSES = 95
+    EXPECTED_CLAUSES = 96
     ids = [r["no"] for r in rows]
     if len(rows) != EXPECTED_CLAUSES or ids != list(range(1, EXPECTED_CLAUSES + 1)):
         print("CLAUSE-SET CHECK FAIL: 条款数=%d（期望 %d）或编号非 1..%d 连续——条款行可能被静默增删（F-159）"
@@ -394,6 +394,10 @@ def main():
           "④c 台账指名文件均存在（F-125）；"
           "共漂移由 ②查负责（F-128，非 ④ 域）；"
           "④ 的其余人工核验项见 regression-checks.md ④ 定义段")
+    _lg = open(os.path.join(HERE, "regression-checks.md"), encoding="utf-8").read()
+    print("④-deferred（F-173 机读代理，非阻塞）: ⏸ 标记=%d；「挂账」提及=%d"
+          " —— 宣告稳态时人工须核两者为 0（未闭合推迟项与 ⏸ 同权）"
+          % (_lg.count("⏸"), _lg.count("挂账")))
     sys.exit(1 if fails else 0)
 
 
